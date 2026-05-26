@@ -1,0 +1,83 @@
+"""Main agent loop.
+
+Given a company name, fan out to Bright Data sources, then ask the LLM to
+synthesize a structured Brief. This is the orchestration core — keep it
+readable; everything that can be tucked into a sub-module should be.
+"""
+
+from __future__ import annotations
+
+import logging
+import sys
+from dataclasses import dataclass
+from typing import Optional
+
+from .llm import complete_structured
+from .models import Brief
+from .sources import linkedin, serp, unlocker
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class ScoutInput:
+    company_name: str
+    founder_name: Optional[str] = None
+
+
+SYSTEM_PROMPT = """You are a senior VC investment associate at an early-stage AI/dev-tools fund.
+You are reviewing inbound deal flow. Given raw web intelligence about a company,
+produce a structured investor brief. Be specific, cite sources, and surface red flags
+honestly. Do not fabricate data — if a field is unknown, omit it or mark it null.
+Your recommendation must follow from the evidence; explain your reasoning."""
+
+
+def build_brief(scout_input: ScoutInput) -> Brief:
+    """End-to-end: fetch web intelligence, synthesize a Brief, return it."""
+    company = scout_input.company_name
+    log.info("Building brief for %s", company)
+
+    # 1. Fan out to data sources (these are stubs for now)
+    serp_data = serp.search_company(company)
+    github_data = unlocker.fetch_github(company)
+    linkedin_data = linkedin.fetch_company(company)
+
+    # 2. Stitch the evidence into a synthesis prompt
+    evidence = _format_evidence(
+        company=company,
+        serp_data=serp_data,
+        github_data=github_data,
+        linkedin_data=linkedin_data,
+    )
+
+    # 3. Ask the LLM to produce a structured Brief
+    return complete_structured(
+        prompt=evidence,
+        schema=Brief,
+        system=SYSTEM_PROMPT,
+    )
+
+
+def _format_evidence(company: str, serp_data, github_data, linkedin_data) -> str:
+    """Stitch source outputs into a single prompt body."""
+    return (
+        f"Company: {company}\n\n"
+        f"--- SEARCH RESULTS ---\n{serp_data}\n\n"
+        f"--- GITHUB / OPEN SOURCE ---\n{github_data}\n\n"
+        f"--- LINKEDIN ---\n{linkedin_data}\n"
+    )
+
+
+def main() -> None:
+    """CLI entrypoint: `python -m vc_scout.orchestrator <company name>`"""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    if len(sys.argv) < 2:
+        print("Usage: python -m vc_scout.orchestrator <company name>")
+        sys.exit(1)
+    company = " ".join(sys.argv[1:])
+    brief = build_brief(ScoutInput(company_name=company))
+    print(brief.model_dump_json(indent=2))
+
+
+if __name__ == "__main__":
+    main()

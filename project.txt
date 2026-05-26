@@ -1,0 +1,203 @@
+# VC Scout
+
+> AI scouting agent that turns a company name into an investor-ready brief in 90 seconds, powered by Bright Data's multi-source web intelligence.
+
+**Built for:** Bright Data Web Data UNLOCKED Hackathon 2026
+**Track:** GTM Intelligence
+**Builder:** Karthik Narayan Sudheer (solo)
+**Timeline:** May 26–30, 2026
+
+---
+
+## One-line pitch
+
+Cold inbound at 9:00 AM. Investor-ready brief by 9:01 AM. VC Scout is an AI agent that gives early-stage investors instant deep research on AI and dev-tools startups, replacing 30–60 minutes of manual scouting with under two minutes of automated, multi-source web intelligence.
+
+---
+
+## The problem
+
+Early-stage VC associates and scouts see 200+ companies per month through inbound deal flow, referrals, demo days, and cold outreach. For each one, they need to triage fast — which deserves a 30-minute call, which gets a pass.
+
+Manual research per company today: 30–60 minutes spent across LinkedIn (founder backgrounds), GitHub (technical traction), news sites (recent press), Crunchbase (funding history), Hacker News, X/Twitter, and product launch pages.
+
+The cost of doing it badly:
+- Investors miss good companies they didn't have time to dig into
+- Investors waste calls on bad-fit companies they should have passed on upfront
+- Junior associates burn hours on triage instead of forming investment theses
+
+Existing tools (Harmonic, Specter, Crunchbase Pro) are expensive enterprise SaaS. Solo angels, scouts, and lean funds need a lighter-weight, on-demand alternative.
+
+---
+
+## The user
+
+**Primary:** Early-stage VC associates and scouts at pre-seed / seed / Series A funds focused on AI infrastructure, dev tools, and applied AI.
+
+**Secondary:** Solo angel investors active in the same space.
+
+Why this user:
+- High deal-flow volume creates a real, daily pain point
+- Public signals are dense in this vertical (GitHub, HN, eng blogs, X)
+- This persona maps directly to the audience at the SF onsite finale — judges and attendees overlap heavily with the user
+
+---
+
+## The solution
+
+A single-input agent: type a company name (optionally with a founder name) and get back a structured investor brief in under 90 seconds.
+
+**Input:**
+- Company name (required)
+- Founder name (optional, auto-detected if omitted)
+
+**Output:** structured brief covering:
+- Founder background and prior track record
+- Traction signals (GitHub stars, npm/PyPI downloads, HN front-page hits, ProductHunt rankings, Twitter following)
+- Hiring velocity and team composition from LinkedIn
+- Recent press, funding history, product launches
+- Competitive positioning in their market segment
+- Red flags (founder turnover, missing public footprint, unverifiable claims)
+- Recommended next step (take a call / pass / dig deeper into X)
+
+---
+
+## Why this fits the GTM Intelligence track
+
+VC scouting is functionally identical to enterprise outbound sales prospecting:
+- Same workflow (research a target before reaching out)
+- Same intel gaps (scattered public sources, manual synthesis)
+- Same tooling needs (multi-source web intelligence with LLM synthesis)
+
+The difference is the user's job title and the size of the "deal." Same GTM problem, different vertical.
+
+---
+
+## Architecture
+User input (company name)
+│
+▼
+┌─────────────────────────────┐
+│   Orchestration layer       │
+│   (Python + LLM)            │
+└─────────────────────────────┘
+│
+├──► Bright Data SERP API ──────► recent news, press, HN mentions
+│
+├──► Bright Data Web Scraper API ─► LinkedIn (founders, team, hiring)
+│
+├──► Bright Data Web Unlocker ───► GitHub, X/Twitter, ProductHunt,
+│                                   pricing pages, engineering blogs
+│
+▼
+┌─────────────────────────────┐
+│   LLM synthesis             │
+│   (Grok / Gemini fallback)  │
+└─────────────────────────────┘
+│
+▼
+Structured investor brief
+
+**Bright Data products in play:**
+- **SERP API** — recent news, press releases, HN front-page hits, founder mentions
+- **Web Scraper API (LinkedIn collectors)** — founder background, team size, hiring velocity
+- **Web Unlocker** — GitHub repo metrics, X/Twitter presence, ProductHunt launches, dynamic pricing pages
+- **MCP Server** (planned) — orchestration adapter exposing Bright Data tools to the LLM
+
+**LLM:** xAI Grok (primary, $25 credits), Google Gemini 2.5 Flash (fallback, free tier)
+
+**Stack:**
+- Python 3.11+
+- `openai` SDK (used as the client for Grok via base_url override)
+- Flask or FastAPI for the demo interface
+- Pydantic for structured output validation
+- `python-dotenv` for environment management
+
+---
+
+## Demo plan
+
+**Demo arc (90 seconds):**
+1. Open the demo URL
+2. Type a real, recent AI startup name (one of three pre-tested companies)
+3. Show the agent's reasoning trace as it pulls from multiple sources
+4. Display the final structured brief
+5. Tap-to-explain any field to show the underlying source
+
+**Three pre-tested demo targets:** *(to be locked Wednesday)*
+
+**Failure modes mitigated:**
+- Cached responses for the three demo companies in case live APIs fail
+- Local fallback to Gemini if Grok rate-limits
+- Pre-recorded video as ultimate backup
+
+---
+
+## Build schedule
+
+| Day | Date | Hours | Phase |
+|-----|------|-------|-------|
+| Tue | May 26 | 3 | Setup: accounts, credits, repo, sanity checks |
+| Wed | May 27 | 8 | MCP + LLM call working end-to-end with hardcoded input |
+| Thu | May 28 | 8 | SERP + Web Scraper integration, real data flowing |
+| Fri | May 29 | 8 | Output layer, error handling, testing on 3 demo targets |
+| Sat | May 30 | 8 | Demo video, README, slides, submit |
+
+**Submission deadline:** *(to be confirmed in UTC during Tuesday setup)*
+
+---
+
+## Judging criteria alignment
+
+| Criterion | How VC Scout addresses it |
+|-----------|---------------------------|
+| Application of Technology | Multi-source Bright Data orchestration (SERP + Web Scraper + Web Unlocker), agentic LLM synthesis, MCP integration |
+| Presentation | Sharp demo arc ("9:00 AM inbound → 9:01 AM decision"), audience-aligned with SF hackathon judges |
+| Business Value | Each saved hour of investor time = $M opportunity cost; bad pass = $10M+ missed; concrete unit economics |
+| Originality | Fewer builders will pick VC scouting vs. saturated outbound SaaS sales angle; vertical specificity in AI/dev-tools |
+
+---
+
+## Out of scope (v1)
+
+- Multi-company comparison and ranking
+- Scheduled monitoring / cron jobs
+- CRM or Slack integrations
+- Authentication and multi-user support
+- Custom investor profile / thesis fitting
+- Anything beyond AI/dev-tools vertical
+
+Defer all of these unless core demo is locked by Friday noon.
+
+---
+
+## Open decisions
+
+- [ ] Lock 3 specific demo target companies (Wednesday)
+- [ ] Frontend approach: Flask + minimal HTML vs. Gradio vs. Streamlit (Thursday)
+- [ ] Demo hosting: Vercel vs. Render vs. Hugging Face Spaces (Friday)
+- [ ] Final project name — `vc-scout` is placeholder, may rename for submission
+
+---
+
+## Submission checklist
+
+- [ ] Project title, short and long descriptions
+- [ ] Technology and category tags
+- [ ] Cover image
+- [ ] Demo video (under 3 min)
+- [ ] Slide deck
+- [ ] Public GitHub repo with clean commit history
+- [ ] Demo app deployed and reachable via public URL
+- [ ] Demonstrable use of at least one Bright Data product (target: 3)
+
+---
+
+## Working principles
+
+1. Ship beats perfect — working demo > elegant unshipped code
+2. Demoable in 90 seconds — every feature is judged against the demo arc
+3. No new frameworks this week — direct SDK calls, no LangChain/CrewAI
+4. GitHub commits every 2–3 hours minimum
+5. Submission materials (video, slides, README) are first-class deliverables, not afterthoughts
+6. 90-minute debugging timebox before simplifying or switching tasks

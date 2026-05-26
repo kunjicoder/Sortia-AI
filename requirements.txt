@@ -1,0 +1,11 @@
+# Core
+openai>=1.40.0
+pydantic>=2.7.0
+python-dotenv>=1.0.1
+requests>=2.32.0
+
+# Frontend (locked to Gradio for the demo)
+gradio>=4.40.0
+
+# Dev / testing
+pytest>=8.0.0
