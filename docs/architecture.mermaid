@@ -1,0 +1,47 @@
+flowchart TD
+    A([fa:fa-user Investor\ntyped company name]) --> B
+
+    subgraph vc_scout ["VC Scout — Python package"]
+        B["orchestrator.py\nbuild_brief()"]
+
+        B -->|"company name\n+ query string"| C
+        C["sources/serp.py\nBright Data SERP API\n\nGoogle search via\nbrd_json=1 proxy"]
+        C -->|"10 parsed results\n{title, url, description}"| D
+
+        D["orchestrator.py\n_format_evidence()\n\nStitch results into\nLLM prompt"]
+        D -->|"evidence block\n+ SYSTEM_PROMPT\n+ Brief JSON schema"| E
+
+        E["llm.py\ncomplete_structured()\n\nAI/ML API\ngpt-4o-mini"]
+        E -->|"raw JSON string\n(4 096 token max)"| F
+
+        F["llm.py\n_coerce_null_lists()\nmodel_validate()\n\nPydantic Brief"]
+    end
+
+    subgraph bd ["Bright Data (external)"]
+        C2["SERP API\napi.brightdata.com/request\nzone: BRIGHTDATA_SERP_ZONE"]
+    end
+
+    subgraph aiml ["AI/ML API (external)"]
+        E2["api.aimlapi.com/v1\nchat/completions\nmodel: gpt-4o-mini"]
+    end
+
+    C <-->|"HTTPS POST\nBearer token"| C2
+    E <-->|"HTTPS POST\nOpenAI-compatible SDK"| E2
+
+    F -->|"ScoutResult\n(brief + serp_ms\n+ llm_ms + source_count)"| G
+
+    subgraph output ["Output layer"]
+        G{"USE_DEMO_CACHE?"}
+        G -->|"true + slug match"| H["demo_cache/<slug>.json\ninstant return"]
+        G -->|"false / unknown"| I["live pipeline"]
+        H --> J
+        I --> J
+        J["app.py\n_render_markdown()\n\nGradio Blocks UI"]
+    end
+
+    J --> K([fa:fa-file-alt Investor Brief\nrecommendation · founders\ntraction · funding · red flags\nN sources · Xs latency])
+
+    style bd fill:#f5f0e8,stroke:#c8a96e
+    style aiml fill:#e8f0f5,stroke:#6e9ac8
+    style vc_scout fill:#f0f5e8,stroke:#7ac86e
+    style output fill:#f5e8f5,stroke:#c86ec8
