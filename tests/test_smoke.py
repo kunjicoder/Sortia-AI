@@ -88,4 +88,4 @@ def test_render_markdown_does_not_raise():
     )
     result = _render_markdown(brief)
     assert "Acme AI" in result
-    assert "DIG_DEEPER" in result or "dig_deeper" in result
+    assert any(s in result for s in ("DIG_DEEPER", "dig_deeper", "DIG DEEPER"))

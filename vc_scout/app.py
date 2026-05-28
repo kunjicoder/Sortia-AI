@@ -13,56 +13,144 @@ import logging
 
 import gradio as gr
 
-from .models import Brief
+from .models import Brief, Recommendation
 from .orchestrator import ScoutInput, build_brief
 
 log = logging.getLogger(__name__)
 
+_BADGE = {
+    Recommendation.TAKE_CALL: (
+        "🟢",
+        "#1a7a1a",
+        "TAKE THE CALL",
+    ),
+    Recommendation.DIG_DEEPER: (
+        "🟡",
+        "#7a6200",
+        "DIG DEEPER",
+    ),
+    Recommendation.PASS: (
+        "🔴",
+        "#8b0000",
+        "PASS",
+    ),
+}
 
-def run(company: str, founder: str) -> str:
+_PROGRESS_STEPS = [
+    "Searching the web…",
+    "Reading sources…",
+    "Synthesizing brief…",
+]
+
+
+def run(company: str, founder: str):
     company = (company or "").strip()
     if not company:
-        return "Please enter a company name."
+        yield "Please enter a company name."
+        return
     founder = (founder or "").strip() or None
+
+    for step in _PROGRESS_STEPS:
+        yield f"*{step}*"
+
     try:
         brief = build_brief(ScoutInput(company_name=company, founder_name=founder))
     except Exception as e:
         log.exception("build_brief failed")
-        return f"**Error:** {e}"
-    return _render_markdown(brief)
+        yield f"**Error:** {e}"
+        return
+
+    yield _render_markdown(brief)
 
 
 def _render_markdown(brief: Brief) -> str:
-    """Render a Brief as markdown for display in Gradio."""
+    emoji, color, label = _BADGE.get(brief.recommendation, ("⚪", "#555", brief.recommendation.value.upper()))
+
     lines = [
         f"# {brief.company_name}",
         f"*{brief.one_liner}*",
         "",
-        f"**Recommendation:** `{brief.recommendation.value}` — {brief.recommendation_rationale}",
+        # Recommendation first — that's what a VC reads first
+        f'<div style="display:inline-block;padding:6px 14px;border-radius:6px;'
+        f'background:{color};color:#fff;font-weight:bold;font-size:1.1em;">'
+        f"{emoji} {label}</div>",
+        "",
+        f"**Rationale:** {brief.recommendation_rationale}",
+        "",
+        "---",
         "",
         "## Founders",
     ]
     for f in brief.founders:
-        lines.append(f"- **{f.name}** — {f.role}. {f.background}")
-    lines.append("")
-    lines.append("## Traction")
-    lines.append(brief.traction.summary)
-    lines.append("")
-    lines.append("## Hiring")
-    lines.append(brief.hiring.summary)
+        line = f"- **{f.name}** — {f.role}. {f.background}"
+        if f.notable_priors:
+            line += f" *(Prior: {', '.join(f.notable_priors)})*"
+        lines.append(line)
+
+    lines += [
+        "",
+        "## Traction",
+        brief.traction.summary,
+    ]
+    _maybe_append(lines, "GitHub", brief.traction.github_url)
+    if brief.traction.hn_mentions:
+        lines.append("**HN mentions:** " + " · ".join(brief.traction.hn_mentions))
+
+    lines += [
+        "",
+        "## Hiring",
+        brief.hiring.summary,
+    ]
+    if brief.hiring.open_roles:
+        lines.append(f"**Open roles:** {brief.hiring.open_roles}")
+
+    if brief.funding_history:
+        lines += ["", "## Funding"]
+        for r in brief.funding_history:
+            investors = f" ({', '.join(r.investors)})" if r.investors else ""
+            date = f" — {r.date}" if r.date else ""
+            lines.append(f"- **{r.round}** {r.amount or ''}{date}{investors}")
+
+    if brief.recent_press:
+        lines += ["", "## Recent Press"]
+        for p in brief.recent_press:
+            date = f" ({p.date})" if p.date else ""
+            lines.append(f"- [{p.title}]({p.url}){date} — *{p.source}*")
+
+    if brief.competitive_positioning:
+        cp = brief.competitive_positioning
+        lines += [
+            "",
+            "## Competitive Positioning",
+            f"**Segment:** {cp.market_segment}",
+            f"**Differentiation:** {cp.differentiation}",
+        ]
+        if cp.competitors:
+            lines.append(f"**Competitors:** {', '.join(cp.competitors)}")
+
     if brief.red_flags:
-        lines.append("")
-        lines.append("## Red flags")
+        lines += ["", "## Red Flags"]
         for rf in brief.red_flags:
             lines.append(f"- **{rf.category}** — {rf.detail}")
+
+    if brief.sources:
+        lines += ["", "---", "", "## Sources"]
+        for url in brief.sources:
+            lines.append(f"- <{url}>")
+
     return "\n".join(lines)
+
+
+def _maybe_append(lines: list, label: str, value: str | None) -> None:
+    if value:
+        lines.append(f"**{label}:** {value}")
 
 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="VC Scout") as ui:
         gr.Markdown("# VC Scout\nCold inbound at 9:00 AM. Investor-ready brief by 9:01 AM.")
         with gr.Row():
-            company = gr.Textbox(label="Company name", placeholder="e.g. Anthropic")
+            company = gr.Textbox(label="Company name", placeholder="e.g. Anthropic", value="Wispr Flow")
             founder = gr.Textbox(label="Founder name (optional)")
         button = gr.Button("Scout", variant="primary")
         output = gr.Markdown()
