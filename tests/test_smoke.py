@@ -66,6 +66,7 @@ def test_render_markdown_does_not_raise():
         Recommendation,
         TractionSignals,
     )
+    from vc_scout.orchestrator import ScoutResult
 
     brief = Brief(
         company_name="Acme AI",
@@ -86,6 +87,8 @@ def test_render_markdown_does_not_raise():
         recommendation=Recommendation.DIG_DEEPER,
         recommendation_rationale="Strong team, unclear traction signal yet.",
     )
-    result = _render_markdown(brief)
+    scout_result = ScoutResult(brief=brief, serp_ms=1200, llm_ms=5800, source_count=4)
+    result = _render_markdown(scout_result)
     assert "Acme AI" in result
     assert any(s in result for s in ("DIG_DEEPER", "dig_deeper", "DIG DEEPER"))
+    assert "sources read" in result

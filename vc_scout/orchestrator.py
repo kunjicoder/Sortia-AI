@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import re
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -45,6 +46,21 @@ class ScoutInput:
     founder_name: Optional[str] = None
 
 
+@dataclass
+class ScoutResult:
+    brief: Brief
+    serp_ms: int
+    llm_ms: int
+    source_count: int
+
+    @property
+    def total_ms(self) -> int:
+        return self.serp_ms + self.llm_ms
+
+    def stats_line(self) -> str:
+        return f"{self.source_count} sources read · brief generated in {self.total_ms / 1000:.1f}s"
+
+
 SYSTEM_PROMPT = """You are a senior VC investment associate at an early-stage AI/dev-tools fund.
 You are reviewing inbound deal flow. Given raw web intelligence about a company,
 produce a structured investor brief. Follow these rules exactly:
@@ -68,32 +84,48 @@ GENERAL
 - Your recommendation must follow from the evidence; explain your reasoning in 2-3 sentences."""
 
 
-def build_brief(scout_input: ScoutInput) -> Brief:
-    """End-to-end: fetch web intelligence, synthesize a Brief, return it."""
+def build_brief(scout_input: ScoutInput) -> ScoutResult:
+    """End-to-end: fetch web intelligence, synthesize a Brief, return ScoutResult."""
     company = scout_input.company_name
     log.info("Building brief for %s", company)
 
     if settings.use_demo_cache:
         cached = _load_cache(company)
         if cached is not None:
-            return cached
+            return ScoutResult(
+                brief=cached,
+                serp_ms=0,
+                llm_ms=0,
+                source_count=len(cached.sources),
+            )
 
     # 1. Bright Data SERP API — recent news, funding, hiring, launch signals.
+    t0 = time.perf_counter()
     serp_data = serp.search_company(company)
+    serp_ms = int((time.perf_counter() - t0) * 1000)
+    log.info("SERP: %d results in %dms", len(serp_data), serp_ms)
 
     if not serp_data:
         log.warning("No SERP results for %s — returning insufficient-data brief", company)
-        return _insufficient_data_brief(company)
+        brief = _insufficient_data_brief(company)
+        return ScoutResult(brief=brief, serp_ms=serp_ms, llm_ms=0, source_count=0)
 
     # 2. Stitch the evidence into a synthesis prompt
     evidence = _format_evidence(company=company, serp_data=serp_data)
 
     # 3. Ask the LLM to produce a structured Brief
-    return complete_structured(
+    t1 = time.perf_counter()
+    brief = complete_structured(
         prompt=evidence,
         schema=Brief,
         system=SYSTEM_PROMPT,
     )
+    llm_ms = int((time.perf_counter() - t1) * 1000)
+    source_count = len(brief.sources)
+    log.info("LLM: %d sources cited in %dms", source_count, llm_ms)
+    log.info("Total: %s", ScoutResult(brief=brief, serp_ms=serp_ms, llm_ms=llm_ms, source_count=source_count).stats_line())
+
+    return ScoutResult(brief=brief, serp_ms=serp_ms, llm_ms=llm_ms, source_count=source_count)
 
 
 def _insufficient_data_brief(company: str) -> Brief:
@@ -140,8 +172,9 @@ def main() -> None:
         print("Usage: python -m vc_scout.orchestrator <company name>")
         sys.exit(1)
     company = " ".join(sys.argv[1:])
-    brief = build_brief(ScoutInput(company_name=company))
-    print(brief.model_dump_json(indent=2))
+    result = build_brief(ScoutInput(company_name=company))
+    print(result.brief.model_dump_json(indent=2))
+    print(f"\n# {result.stats_line()}", file=sys.stderr)
 
 
 if __name__ == "__main__":

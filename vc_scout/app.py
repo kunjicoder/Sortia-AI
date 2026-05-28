@@ -14,7 +14,7 @@ import logging
 import gradio as gr
 
 from .models import Brief, Recommendation
-from .orchestrator import ScoutInput, build_brief
+from .orchestrator import ScoutInput, ScoutResult, build_brief
 
 log = logging.getLogger(__name__)
 
@@ -54,16 +54,17 @@ def run(company: str, founder: str):
         yield f"*{step}*"
 
     try:
-        brief = build_brief(ScoutInput(company_name=company, founder_name=founder))
+        result = build_brief(ScoutInput(company_name=company, founder_name=founder))
     except Exception as e:
         log.exception("build_brief failed")
         yield f"**Error:** {e}"
         return
 
-    yield _render_markdown(brief)
+    yield _render_markdown(result)
 
 
-def _render_markdown(brief: Brief) -> str:
+def _render_markdown(result: ScoutResult) -> str:
+    brief = result.brief
     emoji, color, label = _BADGE.get(brief.recommendation, ("⚪", "#555", brief.recommendation.value.upper()))
 
     lines = [
@@ -137,6 +138,9 @@ def _render_markdown(brief: Brief) -> str:
         lines += ["", "---", "", "## Sources"]
         for url in brief.sources:
             lines.append(f"- <{url}>")
+
+    if result.total_ms > 0:
+        lines += ["", "---", f"*{result.stats_line()}*"]
 
     return "\n".join(lines)
 
