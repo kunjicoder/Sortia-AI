@@ -59,6 +59,7 @@ def complete(prompt: str, system: str = "", model: str | None = None) -> str:
     resp = client.chat.completions.create(
         model=model or default_model,
         messages=messages,
+        max_tokens=4096,
     )
     return resp.choices[0].message.content or ""
 
@@ -91,28 +92,42 @@ def complete_structured(
 def _coerce_null_lists(obj, schema: type[BaseModel] | None = None):
     """Recursively replace null list fields with [] so Pydantic List fields don't reject them.
 
-    Only coerces to [] when the corresponding schema field is typed as a list
-    (not Optional[int] etc.), avoiding clobbering genuinely nullable scalars.
+    Only coerces null→[] when the corresponding schema field annotation is list[X].
+    Recurses into nested dicts (sub-models) and list items so deeply nested null
+    list fields (e.g. FundingRound.investors inside funding_history) are also fixed.
     """
+    if isinstance(obj, list):
+        return [_coerce_null_lists(item, schema) for item in obj]
     if not isinstance(obj, dict):
         return obj
 
+    import typing
     fields = schema.model_fields if schema is not None else {}
     result = {}
     for k, v in obj.items():
         field = fields.get(k)
-        if v is None and field is not None:
-            ann = field.annotation
-            origin = getattr(ann, "__origin__", None)
-            # list or List[X] — null → []
-            if origin is list:
-                result[k] = []
-                continue
-        # recurse into nested dicts with the nested schema if available
+        ann = field.annotation if field is not None else None
+        origin = getattr(ann, "__origin__", None)
+
+        if v is None and origin is list:
+            result[k] = []
+            continue
+
+        # Determine the nested schema to pass when recursing
         nested_schema = None
-        if field is not None and isinstance(v, dict):
-            ann = field.annotation
+        if ann is not None:
             if isinstance(ann, type) and issubclass(ann, BaseModel):
                 nested_schema = ann
-        result[k] = _coerce_null_lists(v, nested_schema) if isinstance(v, dict) else v
+            elif origin is list:
+                # List[SomeModel] — unwrap the element type
+                args = getattr(ann, "__args__", ())
+                if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
+                    nested_schema = args[0]
+
+        if isinstance(v, dict):
+            result[k] = _coerce_null_lists(v, nested_schema)
+        elif isinstance(v, list):
+            result[k] = [_coerce_null_lists(item, nested_schema) if isinstance(item, dict) else item for item in v]
+        else:
+            result[k] = v
     return result
