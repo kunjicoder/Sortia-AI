@@ -1,0 +1,40 @@
+{
+  "company_name": "GodHands",
+  "one_liner": "GodHands is a deterministic computer use layer that enables AI agents to reliably operate across browser and desktop applications.",
+  "founders": [],
+  "traction": {
+    "github_stars": null,
+    "github_url": null,
+    "npm_pypi_downloads": null,
+    "hn_mentions": [],
+    "producthunt_rank": null,
+    "twitter_followers": null,
+    "summary": "GodHands is actively engaged in developing tools for AI agents but lacks significant public traction indicators such as GitHub stars or notable downloads."
+  },
+  "hiring": {
+    "team_size": null,
+    "open_roles": 0,
+    "recent_hires": [],
+    "summary": "Currently, there is no information available regarding the team size or open roles at GodHands."
+  },
+  "recent_press": [],
+  "funding_history": [],
+  "competitive_positioning": {
+    "market_segment": "AI tools and infrastructure",
+    "competitors": [],
+    "differentiation": "Offers a deterministic layer for AI operations across applications, aiming for reliability."
+  },
+  "red_flags": [
+    {
+      "category": "missing_footprint",
+      "detail": "GodHands has minimal public visibility and lacks established traction metrics."
+    }
+  ],
+  "recommendation": "dig_deeper",
+  "recommendation_rationale": "While the concept of a deterministic layer for AI tools is intriguing, GodHands has a very limited public footprint and lacks concrete traction signals. Further investigation into their pipeline, product development, and potential market fit is warranted.",
+  "sources": [
+    "https://www.ycombinator.com/companies/godhands",
+    "https://www.startuphub.ai/startups/godhands",
+    "https://www.crunchbase.com/organization/godhands-private-limited"
+  ]
+}
