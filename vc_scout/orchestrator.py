@@ -14,7 +14,10 @@ from typing import Optional
 
 from .llm import complete_structured
 from .models import Brief
-from .sources import linkedin, serp, unlocker
+from .sources import serp
+
+# NOTE: LinkedIn (Web Scraper API) is cut from the demo path — hardest scraping
+# target, highest risk, no runway. Web Unlocker is added in V2 as source #2.
 
 log = logging.getLogger(__name__)
 
@@ -37,18 +40,11 @@ def build_brief(scout_input: ScoutInput) -> Brief:
     company = scout_input.company_name
     log.info("Building brief for %s", company)
 
-    # 1. Fan out to data sources (these are stubs for now)
+    # 1. Bright Data SERP API — recent news, funding, hiring, launch signals.
     serp_data = serp.search_company(company)
-    github_data = unlocker.fetch_github(company)
-    linkedin_data = linkedin.fetch_company(company)
 
     # 2. Stitch the evidence into a synthesis prompt
-    evidence = _format_evidence(
-        company=company,
-        serp_data=serp_data,
-        github_data=github_data,
-        linkedin_data=linkedin_data,
-    )
+    evidence = _format_evidence(company=company, serp_data=serp_data)
 
     # 3. Ask the LLM to produce a structured Brief
     return complete_structured(
@@ -58,13 +54,11 @@ def build_brief(scout_input: ScoutInput) -> Brief:
     )
 
 
-def _format_evidence(company: str, serp_data, github_data, linkedin_data) -> str:
+def _format_evidence(company: str, serp_data) -> str:
     """Stitch source outputs into a single prompt body."""
     return (
         f"Company: {company}\n\n"
-        f"--- SEARCH RESULTS ---\n{serp_data}\n\n"
-        f"--- GITHUB / OPEN SOURCE ---\n{github_data}\n\n"
-        f"--- LINKEDIN ---\n{linkedin_data}\n"
+        f"--- SEARCH RESULTS (Bright Data SERP API) ---\n{serp_data}\n"
     )
 
 

@@ -26,6 +26,14 @@ class Settings:
     grok_base_url: str = "https://api.x.ai/v1"
     grok_model: str = "grok-2-latest"
 
+    # AI/ML API (partner) — OpenAI-compatible unified model gateway.
+    aiml_api_key: str = ""
+    aiml_base_url: str = "https://api.aimlapi.com/v1"
+    aiml_model: str = "gpt-4o-mini"
+
+    # Which provider the LLM client uses: "aiml" (partner) or "grok".
+    llm_provider: str = "aiml"
+
     # Bright Data
     brightdata_api_key: str = ""
     brightdata_serp_zone: str = ""
@@ -45,6 +53,9 @@ def load_settings() -> Settings:
     return Settings(
         grok_api_key=_env("GROK_API_KEY"),
         gemini_api_key=_env("GEMINI_API_KEY"),
+        aiml_api_key=_env("AIML_API_KEY"),
+        aiml_model=_env("AIML_MODEL", "gpt-4o-mini"),
+        llm_provider=_env("LLM_PROVIDER", "aiml").lower(),
         brightdata_api_key=_env("BRIGHTDATA_API_KEY"),
         brightdata_serp_zone=_env("BRIGHTDATA_SERP_ZONE"),
         brightdata_unlocker_zone=_env("BRIGHTDATA_UNLOCKER_ZONE"),

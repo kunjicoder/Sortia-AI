@@ -36,6 +36,7 @@ class TractionSignals(BaseModel):
     summary: str = Field(description="One-paragraph synthesis of overall traction")
 
 
+
 class HiringSignals(BaseModel):
     team_size: Optional[int] = None
     open_roles: int = 0
