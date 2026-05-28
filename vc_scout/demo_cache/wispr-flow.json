@@ -1,0 +1,70 @@
+{
+  "company_name": "Wispr Flow",
+  "one_liner": "AI-powered dictation app that enables users to talk 4x faster and transform speech into text effortlessly.",
+  "founders": [
+    {
+      "name": "Tanay Kothari",
+      "role": "Co-founder",
+      "background": "Tanay has extensive experience in voice technology and AI applications, having previously worked on similar tech ventures that focus on enhancing user interaction through voice. His educational background includes a degree from a top university specializing in information technology.",
+      "linkedin_url": "https://www.linkedin.com/company/wisprflow",
+      "notable_priors": []
+    }
+  ],
+  "traction": {
+    "github_stars": null,
+    "github_url": null,
+    "npm_pypi_downloads": null,
+    "hn_mentions": [],
+    "producthunt_rank": null,
+    "twitter_followers": null,
+    "summary": "Wispr Flow has notably gained traction since its launch in 2024, achieving rapid user adoption and recognition. It recently raised $30 million in Series A funding, indicating strong investor confidence and validating its market potential."
+  },
+  "hiring": {
+    "team_size": null,
+    "open_roles": 19,
+    "recent_hires": [],
+    "summary": "Wispr Flow is actively hiring, with 19 open positions across various departments including engineering, marketing, and machine learning. This indicates growth and confidence in scaling operations."
+  },
+  "recent_press": [
+    {
+      "title": "Wispr Flow raises $30M from Menlo Ventures for its AI-powered dictation app",
+      "url": "https://techcrunch.com/2025/06/24/wispr-flow-raises-30m-from-menlo-ventures-for-its-ai-powered-dictation-app/",
+      "source": "TechCrunch",
+      "date": "2025-06-24"
+    },
+    {
+      "title": "Wispr raises new funding, to Build the Voice OS",
+      "url": "https://wisprflow.ai/new-funding",
+      "source": "Wispr Flow",
+      "date": "2025-11-20"
+    }
+  ],
+  "funding_history": [
+    {
+      "round": "Series A",
+      "amount": "$30M",
+      "date": "2025-06-24",
+      "investors": [
+        "Menlo Ventures"
+      ]
+    }
+  ],
+  "competitive_positioning": {
+    "market_segment": "AI dictation and voice-to-text applications",
+    "competitors": [
+      "Otter.ai",
+      "Google Voice Typing"
+    ],
+    "differentiation": "Wispr Flow emphasizes speed and formatting accuracy, offering a unique user experience designed to minimize typing and enhance productivity."
+  },
+  "red_flags": [],
+  "recommendation": "take_call",
+  "recommendation_rationale": "Given the successful funding round and the proactive hiring strategy, Wispr Flow shows strong potential for growth in the voice technology space. The team appears committed to expanding their market presence, making it worth further exploration.",
+  "sources": [
+    "https://wisprflow.ai/about",
+    "https://wisprflow.ai/careers",
+    "https://techcrunch.com/2025/06/24/wispr-flow-raises-30m-from-menlo-ventures-for-its-ai-powered-dictation-app/",
+    "https://wisprflow.ai/new-funding",
+    "https://www.linkedin.com/company/wisprflow"
+  ]
+}

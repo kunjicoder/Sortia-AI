@@ -1,0 +1,99 @@
+{
+  "company_name": "Cursor",
+  "one_liner": "Cursor is transforming the way software is built with innovative AI coding tools.",
+  "founders": [
+    {
+      "name": "Kody",
+      "role": "CEO & Co-founder",
+      "background": "Kody has a strong background in software engineering and AI, previously working at leading tech companies before founding Cursor.",
+      "linkedin_url": null,
+      "notable_priors": [
+        "Leading tech companies in AI development",
+        "Background in software engineering"
+      ]
+    },
+    {
+      "name": "Zach",
+      "role": "CTO & Co-founder",
+      "background": "Zach has extensive experience in product engineering and has been a pivotal figure in launching innovative tech products.",
+      "linkedin_url": null,
+      "notable_priors": [
+        "Pivotal roles in tech product launches",
+        "Strong engineering background"
+      ]
+    }
+  ],
+  "traction": {
+    "github_stars": null,
+    "github_url": null,
+    "npm_pypi_downloads": null,
+    "hn_mentions": [],
+    "producthunt_rank": null,
+    "twitter_followers": null,
+    "summary": "Cursor is rapidly growing, raising $2.3B in funding in just 5 months with a valuation of $29.3B. The platform has attracted millions of developers and is positioned as a leader in AI coding solutions."
+  },
+  "hiring": {
+    "team_size": null,
+    "open_roles": 0,
+    "recent_hires": [],
+    "summary": "Cursor currently has an expanding team, reflecting its growth and ambition to lead in AI coding tools."
+  },
+  "recent_press": [
+    {
+      "title": "Cursor Acquired for $60BN | Anthropic Hits $1TRN in ...",
+      "url": "https://www.youtube.com/watch?v=s61XVZAt5ns",
+      "source": "youtube",
+      "date": null
+    },
+    {
+      "title": "Cursor Goes To War For AI Coding Dominance",
+      "url": "https://www.forbes.com/sites/annatong/2026/03/05/cursor-goes-to-war-for-ai-coding-dominance/",
+      "source": "Forbes",
+      "date": null
+    },
+    {
+      "title": "Cursor Raised $2.3B in 5 Months, but the Math Doesn't Work.",
+      "url": "https://canartuc.medium.com/cursor-raised-2-3b-in-5-months-but-the-math-doesnt-work-2a3294039b47",
+      "source": "Medium",
+      "date": null
+    },
+    {
+      "title": "Microsoft looked at buying Cursor before SpaceX deal, ...",
+      "url": "https://www.cnbc.com/2026/04/22/microsoft-looked-at-buying-cursor-before-spacex-deal-sources-say.html",
+      "source": "CNBC",
+      "date": null
+    }
+  ],
+  "funding_history": [
+    {
+      "round": "Series D",
+      "amount": "$2.3B",
+      "date": null,
+      "investors": []
+    }
+  ],
+  "competitive_positioning": {
+    "market_segment": "AI Coding Tools",
+    "competitors": [
+      "OpenAI",
+      "xAI",
+      "GitHub Copilot"
+    ],
+    "differentiation": "Cursor is building an advanced AI code editor that goes beyond current alternatives by providing a more intuitive and powerful coding experience."
+  },
+  "red_flags": [
+    {
+      "category": "unverifiable_claim",
+      "detail": "Cursor has claimed to have a $29.3B valuation and raised significant funds, but analyses suggest economic challenges with a -96% return on customer revenue."
+    }
+  ],
+  "recommendation": "dig_deeper",
+  "recommendation_rationale": "While Cursor shows aggressive growth and significant funding, concerns about their return on customer revenue and the sustainability of their valuation warrant further investigation.",
+  "sources": [
+    "https://cursor.com/careers",
+    "https://www.youtube.com/watch?v=s61XVZAt5ns",
+    "https://www.forbes.com/sites/annatong/2026/03/05/cursor-goes-to-war-for-ai-coding-dominance/",
+    "https://www.cnbc.com/2026/04/22/microsoft-looked-at-buying-cursor-before-spacex-deal-sources-say.html",
+    "https://canartuc.medium.com/cursor-raised-2-3b-in-5-months-but-the-math-doesnt-work-2a3294039b47"
+  ]
+}

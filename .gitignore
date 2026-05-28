@@ -64,6 +64,5 @@ claude_code_review_prompt.md
 learning_session_*.md
 
 # Demo artifacts (regenerable)
-demo_cache/
 *.mp4
 *.mov

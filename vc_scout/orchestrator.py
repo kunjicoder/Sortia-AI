@@ -8,10 +8,13 @@ readable; everything that can be tucked into a sub-module should be.
 from __future__ import annotations
 
 import logging
+import re
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
+from .config import settings
 from .llm import complete_structured
 from .models import Brief
 from .sources import serp
@@ -20,6 +23,20 @@ from .sources import serp
 # target, highest risk, no runway. Web Unlocker is added in V2 as source #2.
 
 log = logging.getLogger(__name__)
+
+_CACHE_DIR = Path(__file__).parent / "demo_cache"
+
+
+def _slug(company: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", company.lower()).strip("-")
+
+
+def _load_cache(company: str) -> Brief | None:
+    path = _CACHE_DIR / f"{_slug(company)}.json"
+    if path.exists():
+        log.info("Demo cache hit for %s (%s)", company, path.name)
+        return Brief.model_validate_json(path.read_text(encoding="utf-8"))
+    return None
 
 
 @dataclass
@@ -55,6 +72,11 @@ def build_brief(scout_input: ScoutInput) -> Brief:
     """End-to-end: fetch web intelligence, synthesize a Brief, return it."""
     company = scout_input.company_name
     log.info("Building brief for %s", company)
+
+    if settings.use_demo_cache:
+        cached = _load_cache(company)
+        if cached is not None:
+            return cached
 
     # 1. Bright Data SERP API — recent news, funding, hiring, launch signals.
     serp_data = serp.search_company(company)
