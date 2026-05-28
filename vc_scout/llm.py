@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Type, TypeVar
 
-from openai import OpenAI
-from pydantic import BaseModel
+from openai import APIError, APITimeoutError, OpenAI, RateLimitError
+from pydantic import BaseModel, ValidationError
 
 from .config import settings
 
@@ -49,19 +50,31 @@ def _client() -> tuple[OpenAI, str]:
 
 
 def complete(prompt: str, system: str = "", model: str | None = None) -> str:
-    """Plain text completion. Returns the assistant's reply as a string."""
+    """Plain text completion with one retry on transient errors."""
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
     client, default_model = _client()
-    resp = client.chat.completions.create(
-        model=model or default_model,
-        messages=messages,
-        max_tokens=4096,
-    )
-    return resp.choices[0].message.content or ""
+    for attempt in range(2):
+        try:
+            resp = client.chat.completions.create(
+                model=model or default_model,
+                messages=messages,
+                max_tokens=4096,
+                timeout=60,
+            )
+            return resp.choices[0].message.content or ""
+        except (APITimeoutError, RateLimitError) as e:
+            if attempt == 0:
+                log.warning("LLM transient error (%s), retrying in 3s…", type(e).__name__)
+                time.sleep(3)
+            else:
+                raise RuntimeError(f"LLM unavailable after retry: {e}") from e
+        except APIError as e:
+            raise RuntimeError(f"LLM API error: {e}") from e
+    return ""  # unreachable
 
 
 def complete_structured(
@@ -83,10 +96,18 @@ def complete_structured(
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
-        log.error("LLM returned non-JSON: %s", raw[:500])
-        raise RuntimeError(f"LLM did not return valid JSON: {e}") from e
+        log.error("LLM returned non-JSON (first 300 chars): %.300s", raw)
+        raise RuntimeError(
+            f"LLM returned malformed JSON — try again. Detail: {e}"
+        ) from e
 
-    return schema.model_validate(_coerce_null_lists(data, schema))
+    try:
+        return schema.model_validate(_coerce_null_lists(data, schema))
+    except ValidationError as e:
+        log.error("Brief schema validation failed: %s", e)
+        raise RuntimeError(
+            f"LLM output didn't match expected schema — try again. Detail: {e}"
+        ) from e
 
 
 def _coerce_null_lists(obj, schema: type[BaseModel] | None = None):

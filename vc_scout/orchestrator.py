@@ -16,7 +16,7 @@ from typing import Optional
 
 from .config import settings
 from .llm import complete_structured
-from .models import Brief
+from .models import Brief, CompetitivePositioning, HiringSignals, Recommendation, RedFlag, TractionSignals
 from .sources import serp
 
 # NOTE: LinkedIn (Web Scraper API) is cut from the demo path — hardest scraping
@@ -81,6 +81,10 @@ def build_brief(scout_input: ScoutInput) -> Brief:
     # 1. Bright Data SERP API — recent news, funding, hiring, launch signals.
     serp_data = serp.search_company(company)
 
+    if not serp_data:
+        log.warning("No SERP results for %s — returning insufficient-data brief", company)
+        return _insufficient_data_brief(company)
+
     # 2. Stitch the evidence into a synthesis prompt
     evidence = _format_evidence(company=company, serp_data=serp_data)
 
@@ -89,6 +93,35 @@ def build_brief(scout_input: ScoutInput) -> Brief:
         prompt=evidence,
         schema=Brief,
         system=SYSTEM_PROMPT,
+    )
+
+
+def _insufficient_data_brief(company: str) -> Brief:
+    """Return a well-formed Brief when SERP finds nothing, rather than crashing."""
+    return Brief(
+        company_name=company,
+        one_liner="Insufficient public data to generate a brief.",
+        founders=[],
+        traction=TractionSignals(
+            summary="No public traction signals found via web search."
+        ),
+        hiring=HiringSignals(summary="No public hiring data found."),
+        competitive_positioning=CompetitivePositioning(
+            market_segment="Unknown",
+            differentiation="Insufficient data.",
+        ),
+        red_flags=[
+            RedFlag(
+                category="missing_footprint",
+                detail="No search results returned for this company name. "
+                       "Verify the name is correct or check private/stealth status.",
+            )
+        ],
+        recommendation=Recommendation.PASS,
+        recommendation_rationale=(
+            "No public information is available for this company. "
+            "Cannot make an informed assessment without further context."
+        ),
     )
 
 
