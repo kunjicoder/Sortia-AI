@@ -80,15 +80,17 @@ EVIDENCE_BUNDLE contains:
 ━━━ HARD RULES — VIOLATION = INVALID OUTPUT ━━━
 
 ANTI-HALLUCINATION: Every named entity you introduce — acquisitions, customers, partnerships,
-  specific people, specific metrics — MUST have a URL already present in web_evidence[].url or
-  founder_claims[].url. If you cannot point to a specific URL in the bundle for a claim, do not
-  make the claim. Omit it entirely.
-  ✗ BAD: "The company acquired Yapify" (unless wisprflow.ai/blog appears in web_evidence)
-  ✓ GOOD: "A 10× ARR increase is cited at [url]"
+  specific people, specific metrics — MUST appear verbatim (or near-verbatim) in the `fact` text
+  of a web_evidence item or in a founder_claims[].claim. Pointing to a URL is not enough — the
+  specific name or number must be present in the snippet text for that URL. If you cannot find
+  the exact name in the bundle text, do not use it. Omit it entirely.
+  ✗ BAD: "The company acquired Yapify" (unless "Yapify" literally appears in a web_evidence fact)
+  ✗ BAD: citing wisprflow.ai/blog for "Yapify acquisition" when no snippet mentions "Yapify"
+  ✓ GOOD: "A 10× ARR increase is cited at [url]" (because "10×" appears in that snippet)
 
-HIDDEN INSIGHT: Must be an inference or pattern you observed across cited evidence — NOT a new
-  named fact. State the specific evidence item(s) it derives from.
-  ✗ BAD: "The acquisition of Yapify positions them well" (introduces uncited fact)
+HIDDEN INSIGHT: Must be an inference or pattern derived from quoted evidence — NOT a new named
+  fact. If it introduces any company name, person, product, or metric not in a snippet, discard it.
+  ✗ BAD: "The acquisition of Yapify positions them well" (introduces uncited named entity)
   ✓ GOOD: "The $30M raise coming 5 months after the 10× ARR signal (per techcrunch.com) suggests
            strong capital efficiency that the round size alone understates."
 
