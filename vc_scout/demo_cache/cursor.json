@@ -1,28 +1,8 @@
 {
   "company_name": "Cursor",
-  "one_liner": "Cursor is transforming the way software is built with innovative AI coding tools.",
-  "founders": [
-    {
-      "name": "Kody",
-      "role": "CEO & Co-founder",
-      "background": "Kody has a strong background in software engineering and AI, previously working at leading tech companies before founding Cursor.",
-      "linkedin_url": null,
-      "notable_priors": [
-        "Leading tech companies in AI development",
-        "Background in software engineering"
-      ]
-    },
-    {
-      "name": "Zach",
-      "role": "CTO & Co-founder",
-      "background": "Zach has extensive experience in product engineering and has been a pivotal figure in launching innovative tech products.",
-      "linkedin_url": null,
-      "notable_priors": [
-        "Pivotal roles in tech product launches",
-        "Strong engineering background"
-      ]
-    }
-  ],
+  "one_liner": "Cursor is transforming the way we build software.",
+  "thesis": "Cursor's rapid growth and significant valuation indicate strong market potential, but its financial sustainability raises concerns.",
+  "founders": [],
   "traction": {
     "github_stars": null,
     "github_url": null,
@@ -30,70 +10,73 @@
     "hn_mentions": [],
     "producthunt_rank": null,
     "twitter_followers": null,
-    "summary": "Cursor is rapidly growing, raising $2.3B in funding in just 5 months with a valuation of $29.3B. The platform has attracted millions of developers and is positioned as a leader in AI coding solutions."
+    "summary": "Cursor achieved a US$29.3 billion valuation and surpassed $3 billion in annual recurring revenue by early 2026."
   },
   "hiring": {
     "team_size": null,
     "open_roles": 0,
     "recent_hires": [],
-    "summary": "Cursor currently has an expanding team, reflecting its growth and ambition to lead in AI coding tools."
+    "summary": "Cursor is gearing up for a 6-month hiring spree in the Asia-Pacific region."
   },
-  "recent_press": [
-    {
-      "title": "Cursor Acquired for $60BN | Anthropic Hits $1TRN in ...",
-      "url": "https://www.youtube.com/watch?v=s61XVZAt5ns",
-      "source": "youtube",
-      "date": null
-    },
-    {
-      "title": "Cursor Goes To War For AI Coding Dominance",
-      "url": "https://www.forbes.com/sites/annatong/2026/03/05/cursor-goes-to-war-for-ai-coding-dominance/",
-      "source": "Forbes",
-      "date": null
-    },
-    {
-      "title": "Cursor Raised $2.3B in 5 Months, but the Math Doesn't Work.",
-      "url": "https://canartuc.medium.com/cursor-raised-2-3b-in-5-months-but-the-math-doesnt-work-2a3294039b47",
-      "source": "Medium",
-      "date": null
-    },
-    {
-      "title": "Microsoft looked at buying Cursor before SpaceX deal, ...",
-      "url": "https://www.cnbc.com/2026/04/22/microsoft-looked-at-buying-cursor-before-spacex-deal-sources-say.html",
-      "source": "CNBC",
-      "date": null
-    }
-  ],
-  "funding_history": [
-    {
-      "round": "Series D",
-      "amount": "$2.3B",
-      "date": null,
-      "investors": []
-    }
-  ],
+  "recent_press": [],
+  "funding_history": [],
   "competitive_positioning": {
-    "market_segment": "AI Coding Tools",
-    "competitors": [
-      "OpenAI",
-      "xAI",
-      "GitHub Copilot"
-    ],
-    "differentiation": "Cursor is building an advanced AI code editor that goes beyond current alternatives by providing a more intuitive and powerful coding experience."
+    "market_segment": "AI coding software",
+    "competitors": [],
+    "differentiation": "Cursor's unique coding platform which integrates AI for software development."
   },
   "red_flags": [
     {
-      "category": "unverifiable_claim",
-      "detail": "Cursor has claimed to have a $29.3B valuation and raised significant funds, but analyses suggest economic challenges with a -96% return on customer revenue."
+      "category": "financial_sustainability",
+      "detail": "Cursor raised $2.3B with a -96% return on customer revenue, indicating serious economic concerns."
     }
   ],
+  "contradictions": [],
+  "decision_drivers": [
+    {
+      "name": "Asymmetry",
+      "score": 8,
+      "rationale": "Cursor operates in the highly competitive AI coding software market which is still evolving, providing opportunities for unique offerings.",
+      "evidence_url": "https://en.wikipedia.org/wiki/Cursor_(company)",
+      "confidence": "High"
+    },
+    {
+      "name": "Defensibility",
+      "score": 6,
+      "rationale": "While Cursor has a unique integration of AI in coding, concerns about its core features being basic limit defensibility.",
+      "evidence_url": "https://news.ycombinator.com/item?id=45915087",
+      "confidence": "Medium"
+    },
+    {
+      "name": "Timing",
+      "score": 7,
+      "rationale": "The growing demand for AI tools in software development aligns well with Cursor's offerings, indicating favorable market timing.",
+      "evidence_url": "https://www.businessinsider.com/cursor-hiring-asia-pacific-singapore-japan-australia-india-roles-gtm-2026-5",
+      "confidence": "High"
+    },
+    {
+      "name": "Founder grit",
+      "score": 4,
+      "rationale": "No founder information is available to assess their track record or domain expertise.",
+      "evidence_url": "",
+      "confidence": "Low"
+    }
+  ],
+  "failure_paths": [
+    "Revenue growth stalls due to economic unsustainability, invalidated by evidence of increasing revenues.",
+    "Increased competition overwhelms market position, invalidated by unique product features or competitive analysis.",
+    "Hiring spree fails to translate into effective talent integration, invalidated by strong hiring success metrics."
+  ],
+  "hidden_insight": "The mention of Cursor securing a major deal with SpaceX indicates substantial validation and potential industry impact.",
+  "next_action": null,
   "recommendation": "dig_deeper",
-  "recommendation_rationale": "While Cursor shows aggressive growth and significant funding, concerns about their return on customer revenue and the sustainability of their valuation warrant further investigation.",
+  "recommendation_rationale": "While Cursor has achieved impressive growth and valuation, concerns about its economic sustainability and customer revenue model require further investigation before considering investment.",
   "sources": [
     "https://cursor.com/careers",
-    "https://www.youtube.com/watch?v=s61XVZAt5ns",
-    "https://www.forbes.com/sites/annatong/2026/03/05/cursor-goes-to-war-for-ai-coding-dominance/",
-    "https://www.cnbc.com/2026/04/22/microsoft-looked-at-buying-cursor-before-spacex-deal-sources-say.html",
-    "https://canartuc.medium.com/cursor-raised-2-3b-in-5-months-but-the-math-doesnt-work-2a3294039b47"
+    "https://en.wikipedia.org/wiki/Cursor_(company)",
+    "https://www.businessinsider.com/cursor-hiring-asia-pacific-singapore-japan-australia-india-roles-gtm-2026-5",
+    "https://www.fintechweekly.com/news/xai-hires-cursor-andrew-milich-jason-ginsberg-grok-coding-rebuild-2026",
+    "https://canartuc.medium.com/cursor-raised-2-3b-in-5-months-but-the-math-doesnt-work-2a3294039b47",
+    "https://www.theguardian.com/technology/2026/apr/21/spacex-cursor-ai-startup"
   ]
 }
