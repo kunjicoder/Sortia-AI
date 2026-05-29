@@ -18,17 +18,17 @@ from .orchestrator import ScoutInput, ScoutResult, build_brief
 log = logging.getLogger(__name__)
 
 _BADGE = {
-    Recommendation.TAKE_CALL:  ("🟢", "#1a7a1a", "GO — TAKE THE CALL"),
-    Recommendation.DIG_DEEPER: ("🟡", "#7a6200", "SECOND LOOK — DIG DEEPER"),
-    Recommendation.PASS:       ("🔴", "#8b0000", "NO-GO — PASS"),
+    Recommendation.TAKE_CALL:  ("#1a7a1a", "GO — TAKE THE CALL"),
+    Recommendation.DIG_DEEPER: ("#7a6200", "SECOND LOOK — DIG DEEPER"),
+    Recommendation.PASS:       ("#8b0000", "NO-GO — PASS"),
 }
 
-_SCORE_BAR = {
-    range(1, 4):  ("🔴", "not-venture-scale"),
-    range(4, 7):  ("🟡", "plausible 10×"),
-    range(7, 9):  ("🟢", "real moat forming"),
-    range(9, 11): ("💎", "category-defining"),
-}
+_SCORE_LABEL = [
+    (range(1, 4),  "not venture scale"),
+    (range(4, 7),  "plausible 10×"),
+    (range(7, 9),  "real moat forming"),
+    (range(9, 11), "category-defining"),
+]
 
 _SEVERITY_ICON = {"high": "🔴", "medium": "🟡", "low": "🟢"}
 
@@ -60,50 +60,54 @@ def run(company: str, founder: str):
 
 
 def _score_label(score: int) -> str:
-    for r, (icon, label) in _SCORE_BAR.items():
+    for r, label in _SCORE_LABEL:
         if score in r:
-            return f"{icon} {score}/10 — {label}"
+            return f"{score}/10 · {label}"
     return f"{score}/10"
 
 
 def _render_markdown(result: ScoutResult) -> str:
     brief = result.brief
-    emoji, color, label = _BADGE.get(
+    color, label = _BADGE.get(
         brief.recommendation,
-        ("⚪", "#555", brief.recommendation.value.upper()),
+        ("#555", brief.recommendation.value.upper()),
     )
 
-    lines = [
-        f"# {brief.company_name}",
-        f"*{brief.one_liner}*" if brief.one_liner else "",
-        "",
-    ]
+    lines: list[str] = []
 
-    # ── Verdict badge (most prominent) ──────────────────────────────────────
-    lines += [
-        f'<div style="display:inline-block;padding:8px 18px;border-radius:8px;'
-        f'background:{color};color:#fff;font-weight:bold;font-size:1.15em;">'
-        f"{emoji} {label}</div>",
-        "",
-        f"**Thesis:** {brief.thesis}" if brief.thesis else "",
-        "",
-        f"**Rationale:** {brief.recommendation_rationale}",
-        "",
-        "---",
-    ]
+    # ── Header: name + one-liner + verdict ──────────────────────────────────
+    lines.append(f"# {brief.company_name}")
+    if brief.one_liner:
+        lines.append(f"*{brief.one_liner}*")
+    lines.append("")
+    lines.append(
+        f'<div style="display:inline-block;padding:10px 22px;border-radius:8px;'
+        f'background:{color};color:#fff;font-weight:bold;font-size:1.2em;">'
+        f"{label}</div>"
+    )
+    lines.append("")
+    if brief.thesis:
+        lines.append(f"**Thesis:** {brief.thesis}")
+    lines.append("")
+    lines.append(f"**Rationale:** {brief.recommendation_rationale}")
+    lines.append("")
+    lines.append("---")
 
-    # ── Decision drivers ─────────────────────────────────────────────────────
+    # ── Decision Drivers ─────────────────────────────────────────────────────
     if brief.decision_drivers:
-        lines += ["", "## Decision Drivers"]
+        lines += ["", "## Decision Drivers", ""]
         for d in brief.decision_drivers:
             score_str = _score_label(d.score)
-            conf = f" *[{d.confidence} confidence]*" if d.confidence else ""
-            src = f" ([source]({d.evidence_url}))" if d.evidence_url else ""
-            lines.append(f"- **{d.name}:** {score_str} — {d.rationale}{src}{conf}")
+            conf = f" · *{d.confidence} confidence*" if d.confidence else ""
+            src = f" · [source]({d.evidence_url})" if d.evidence_url else ""
+            lines.append(f"**{d.name}** — {score_str}{conf}")
+            lines.append(f"> {d.rationale}{src}")
+            lines.append("")
 
-    # ── Contradictions (the demo wow) ────────────────────────────────────────
+    # ── Contradictions ───────────────────────────────────────────────────────
+    lines += ["", "## Contradictions"]
     if brief.contradictions:
-        lines += ["", "## Contradictions Found"]
+        lines.append("")
         for c in brief.contradictions:
             icon = _SEVERITY_ICON.get(c.severity.lower(), "⚠️")
             verb = "CONTRADICTS" if c.is_contradiction else "CORROBORATES"
@@ -114,83 +118,103 @@ def _render_markdown(result: ScoutResult) -> str:
                 "",
             ]
     else:
-        lines += ["", "## Contradictions Found", "*No contradictions detected.*"]
+        lines.append("")
+        lines.append(
+            "*No contradictions between company claims and web evidence — claims check out.*"
+        )
+        lines.append("")
 
-    # ── Why this could break ─────────────────────────────────────────────────
+    # ── Why This Could Break ─────────────────────────────────────────────────
     if brief.failure_paths:
-        lines += ["", "## Why This Could Break"]
+        lines += ["", "## Why This Could Break", ""]
         for fp in brief.failure_paths:
             lines.append(f"- {fp}")
 
-    # ── Hidden insight ───────────────────────────────────────────────────────
+    # ── Hidden Insight ───────────────────────────────────────────────────────
     if brief.hidden_insight:
         lines += ["", "## Hidden Insight", f"> {brief.hidden_insight}"]
 
-    # ── Red flags ────────────────────────────────────────────────────────────
-    if brief.red_flags:
-        lines += ["", "## Red Flags"]
-        for rf in brief.red_flags:
-            lines.append(f"- **{rf.category}** — {rf.detail}")
+    # ── Evidence & Sources (collapsed) ──────────────────────────────────────
+    evidence_lines: list[str] = []
 
-    # ── Evidence sections ────────────────────────────────────────────────────
-    lines += ["", "---", "", "## Founders"]
+    if brief.red_flags:
+        evidence_lines += ["### Red Flags", ""]
+        for rf in brief.red_flags:
+            evidence_lines.append(f"- **{rf.category}** — {rf.detail}")
+        evidence_lines.append("")
+
+    evidence_lines += ["### Founders", ""]
     if brief.founders:
         for f in brief.founders:
             line = f"- **{f.name}** — {f.role}. {f.background}"
             if f.notable_priors:
                 line += f" *(Prior: {', '.join(f.notable_priors)})*"
-            lines.append(line)
+            if f.linkedin_url:
+                line += f" [LinkedIn]({f.linkedin_url})"
+            evidence_lines.append(line)
     else:
-        lines.append("*No founder data found in public sources.*")
+        evidence_lines.append("*No founder data found in public sources.*")
+    evidence_lines.append("")
 
-    lines += ["", "## Traction", brief.traction.summary]
+    evidence_lines += ["### Traction", "", brief.traction.summary]
     if brief.traction.github_url:
-        lines.append(f"**GitHub:** {brief.traction.github_url}")
+        evidence_lines.append(f"**GitHub:** {brief.traction.github_url}")
     if brief.traction.hn_mentions:
-        lines.append("**HN:** " + " · ".join(brief.traction.hn_mentions))
+        evidence_lines.append("**HN:** " + " · ".join(brief.traction.hn_mentions))
+    evidence_lines.append("")
 
-    lines += ["", "## Hiring", brief.hiring.summary]
+    evidence_lines += ["### Hiring", "", brief.hiring.summary]
     if brief.hiring.open_roles:
-        lines.append(f"**Open roles:** {brief.hiring.open_roles}")
+        evidence_lines.append(f"**Open roles:** {brief.hiring.open_roles}")
+    evidence_lines.append("")
 
     if brief.funding_history:
-        lines += ["", "## Funding"]
+        evidence_lines += ["### Funding", ""]
         for r in brief.funding_history:
             investors = f" ({', '.join(r.investors)})" if r.investors else ""
             date = f" — {r.date}" if r.date else ""
-            lines.append(f"- **{r.round}** {r.amount or ''}{date}{investors}")
+            evidence_lines.append(f"- **{r.round}** {r.amount or ''}{date}{investors}")
+        evidence_lines.append("")
 
     if brief.recent_press:
-        lines += ["", "## Recent Press"]
+        evidence_lines += ["### Recent Press", ""]
         for p in brief.recent_press:
             date = f" ({p.date})" if p.date else ""
-            lines.append(f"- [{p.title}]({p.url}){date} — *{p.source}*")
+            evidence_lines.append(f"- [{p.title}]({p.url}){date} — *{p.source}*")
+        evidence_lines.append("")
 
     if brief.competitive_positioning:
         cp = brief.competitive_positioning
-        lines += [
-            "", "## Competitive Positioning",
+        evidence_lines += [
+            "### Competitive Positioning", "",
             f"**Segment:** {cp.market_segment}",
             f"**Differentiation:** {cp.differentiation}",
         ]
         if cp.competitors:
-            lines.append(f"**Competitors:** {', '.join(cp.competitors)}")
+            evidence_lines.append(f"**Competitors:** {', '.join(cp.competitors)}")
+        evidence_lines.append("")
 
-    # ── Sources footer ───────────────────────────────────────────────────────
     if brief.sources:
-        lines += ["", "---", "", "## Sources"]
+        evidence_lines += ["### Sources", ""]
         for url in brief.sources:
-            lines.append(f"- <{url}>")
+            evidence_lines.append(f"- <{url}>")
 
+    evidence_body = "\n".join(evidence_lines)
+    lines += [
+        "",
+        "<details>",
+        "<summary><strong>Evidence &amp; Sources</strong></summary>",
+        "",
+        evidence_body,
+        "",
+        "</details>",
+    ]
+
+    # ── Stats footer ─────────────────────────────────────────────────────────
     if result.total_ms > 0:
         lines += ["", "---", f"*{result.stats_line()}*"]
 
     return "\n".join(line for line in lines if line is not None)
-
-
-def _maybe_append(lines: list, label: str, value: str | None) -> None:
-    if value:
-        lines.append(f"**{label}:** {value}")
 
 
 def build_ui() -> gr.Blocks:
