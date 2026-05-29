@@ -69,9 +69,27 @@ class RedFlag(BaseModel):
     detail: str
 
 
+class Contradiction(BaseModel):
+    claim: str = Field(description="The claim the company makes on its own site")
+    claim_url: str = Field(description="URL of the company's own page making the claim")
+    web_evidence: str = Field(description="The contradicting or supporting fact from independent web sources")
+    evidence_url: str = Field(description="URL of the independent source")
+    severity: str = Field(description="high | medium | low")
+    is_contradiction: bool = Field(description="true if contradicts, false if supports/corroborates")
+
+
+class ScoreDriver(BaseModel):
+    name: str = Field(description="Asymmetry | Defensibility | Timing | Founder grit")
+    score: int = Field(ge=1, le=10)
+    rationale: str = Field(description="One sentence justification naming the evidence")
+    evidence_url: str = Field(default="", description="Primary URL supporting this score")
+    confidence: str = Field(description="High | Medium | Low")
+
+
 class Brief(BaseModel):
     company_name: str
     one_liner: str
+    thesis: str = Field(description="Investment thesis in one sentence")
     founders: List[Founder]
     traction: TractionSignals
     hiring: HiringSignals
@@ -79,6 +97,26 @@ class Brief(BaseModel):
     funding_history: List[FundingRound] = Field(default_factory=list)
     competitive_positioning: CompetitivePositioning
     red_flags: List[RedFlag] = Field(default_factory=list)
+    contradictions: List[Contradiction] = Field(
+        default_factory=list,
+        description="Claims from the company site cross-checked against independent web evidence",
+    )
+    decision_drivers: List[ScoreDriver] = Field(
+        default_factory=list,
+        description="Scored drivers: Asymmetry, Defensibility, Timing, Founder grit",
+    )
+    failure_paths: List[str] = Field(
+        default_factory=list,
+        description="3 likeliest ways this company fails",
+    )
+    hidden_insight: Optional[str] = Field(
+        default=None,
+        description="Non-obvious signal grounded in a specific piece of evidence",
+    )
+    next_action: Optional[str] = Field(
+        default=None,
+        description="The one thing a human must do that the system can't",
+    )
     recommendation: Recommendation
     recommendation_rationale: str = Field(description="Why this recommendation, in 2-3 sentences")
     sources: List[str] = Field(default_factory=list, description="URLs referenced during synthesis")

@@ -1,12 +1,11 @@
-"""Main agent loop.
+"""Main agent loop — V2: Bright Data SERP + Scraping Browser → evidence bundle → triangulation brief.
 
-Given a company name, fan out to Bright Data sources, then ask the LLM to
-synthesize a structured Brief. This is the orchestration core — keep it
-readable; everything that can be tucked into a sub-module should be.
+V1 (SERP-only) still works when BRIGHTDATA_BROWSER_URL is not set.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sys
@@ -15,13 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from .bundle import assemble, find_homepage
 from .config import settings
 from .llm import complete_structured
 from .models import Brief, CompetitivePositioning, HiringSignals, Recommendation, RedFlag, TractionSignals
-from .sources import serp
-
-# NOTE: LinkedIn (Web Scraper API) is cut from the demo path — hardest scraping
-# target, highest risk, no runway. Web Unlocker is added in V2 as source #2.
+from .sources import scraping_browser, serp
 
 log = logging.getLogger(__name__)
 
@@ -52,40 +49,68 @@ class ScoutResult:
     serp_ms: int
     llm_ms: int
     source_count: int
+    browser_ms: int = 0
 
     @property
     def total_ms(self) -> int:
-        return self.serp_ms + self.llm_ms
+        return self.serp_ms + self.browser_ms + self.llm_ms
 
     def stats_line(self) -> str:
-        return f"{self.source_count} sources read · brief generated in {self.total_ms / 1000:.1f}s"
+        parts = [f"{self.source_count} sources read"]
+        if self.browser_ms:
+            parts.append(f"site scraped in {self.browser_ms / 1000:.1f}s")
+        parts.append(f"brief generated in {self.total_ms / 1000:.1f}s")
+        return " · ".join(parts)
 
 
-SYSTEM_PROMPT = """You are a senior VC investment associate at an early-stage AI/dev-tools fund.
-You are reviewing inbound deal flow. Given raw web intelligence about a company,
-produce a structured investor brief. Follow these rules exactly:
+# ── Triangulation SYSTEM_PROMPT ──────────────────────────────────────────────
+# Based on the investor-memo prompt spec. Produces structured JSON (Brief schema)
+# rather than markdown, but applies the same triangulation logic.
 
-SOURCES
-- Populate the `sources` field with every URL that appears in the evidence you actually used.
-- Do not leave `sources` empty. If the SERP results include URLs, list them.
-- When you state a fact in any field (funding amount, team size, launch date, etc.),
-  it must be traceable to one of those URLs.
+SYSTEM_PROMPT = """You are the reasoning layer of VC Scout — a top-decile angel reviewing inbound deal flow.
+You reason only over the EVIDENCE_BUNDLE provided. If a fact is not present and not marked a
+founder_claim, you do not know it. Missing data is itself a signal — never fabricate precision.
 
-RED FLAGS
-- Only populate `red_flags` when there is concrete evidence of a problem.
-- Use `missing_footprint` when the company simply lacks public signal — do NOT
-  use `founder_turnover` unless there is actual evidence of a departure or co-founder split.
-- Prefer omitting a red flag entirely over raising a speculative one.
-- Valid categories: `missing_footprint`, `unverifiable_claim`, `founder_turnover`,
-  `revenue_concentration`, `legal_regulatory`, `competitive_moat_risk`.
+EVIDENCE_BUNDLE contains:
+- entity: company metadata
+- founder_claims: claims from the company's own site (Scraping Browser) — UNVERIFIED
+- web_evidence: facts from independent web sources (Bright Data SERP) — higher trust
+- derived_signals: funding/hiring/traction signals heuristically extracted from SERP
 
-GENERAL
-- Do not fabricate data — if a field is unknown, omit it or mark it null.
-- Your recommendation must follow from the evidence; explain your reasoning in 2-3 sentences."""
+YOUR REASONING PROCESS:
+1. TRIANGULATE: For each founder_claim, find supporting or CONTRADICTING web_evidence.
+   Surface every contradiction. A high-severity unresolved contradiction caps verdict at DIG_DEEPER.
+
+2. SCORE four drivers 1–10. Each score MUST name the evidence justifying it.
+   - Asymmetry: Does the insight exploit a non-obvious wedge (data access, regulatory, distribution)?
+   - Defensibility: Network effects, data moat, switching cost, or just features?
+   - Timing: Is the market timing right? Tailwinds or headwinds?
+   - Founder grit: Track record, domain depth, evidence of resilience.
+   Scoring ladder: 1-3 = not-venture-scale, 4-6 = plausible-10x, 7-8 = real-moat-forming, 9-10 = category-defining.
+   If no evidence exists for a driver, set confidence=Low and say so in rationale.
+
+3. RED TEAM: Identify the 3 likeliest ways this company dies. State each as a failure_path string.
+   Include the cheapest evidence that would invalidate each concern.
+
+4. HIDDEN INSIGHT: One non-obvious observation grounded in a specific piece of evidence.
+
+PRINCIPLES:
+- Fundraising ≠ traction. Pilots ≠ PMF. Logos ≠ deployments.
+- Ask "what budget line does this replace?" Favor bottom-up market math.
+- Flag top-down TAM inflation. Prefer specifics over adjectives.
+
+FIELD RULES:
+- contradictions[].is_contradiction = true if claim is contradicted, false if corroborated
+- contradictions[].severity = "high" | "medium" | "low"
+- decision_drivers must include all four named drivers (Asymmetry, Defensibility, Timing, Founder grit)
+- recommendation: "take_call" (GO), "dig_deeper" (SECOND LOOK), or "pass" (NO-GO)
+- sources: every URL from the evidence you actually used
+- Do NOT fabricate data. If a field is unknown, use null or omit it.
+- thesis: single sentence investment thesis"""
 
 
 def build_brief(scout_input: ScoutInput) -> ScoutResult:
-    """End-to-end: fetch web intelligence, synthesize a Brief, return ScoutResult."""
+    """End-to-end pipeline: SERP + Scraping Browser → evidence bundle → triangulation brief."""
     company = scout_input.company_name
     log.info("Building brief for %s", company)
 
@@ -99,7 +124,7 @@ def build_brief(scout_input: ScoutInput) -> ScoutResult:
                 source_count=len(cached.sources),
             )
 
-    # 1. Bright Data SERP API — recent news, funding, hiring, launch signals.
+    # 1. Bright Data SERP API
     t0 = time.perf_counter()
     serp_data = serp.search_company(company)
     serp_ms = int((time.perf_counter() - t0) * 1000)
@@ -110,33 +135,59 @@ def build_brief(scout_input: ScoutInput) -> ScoutResult:
         brief = _insufficient_data_brief(company)
         return ScoutResult(brief=brief, serp_ms=serp_ms, llm_ms=0, source_count=0)
 
-    # 2. Stitch the evidence into a synthesis prompt
-    evidence = _format_evidence(company=company, serp_data=serp_data)
-
-    # 3. Ask the LLM to produce a structured Brief
+    # 2. Bright Data Scraping Browser (best-effort — skipped when URL not configured)
+    homepage = find_homepage(company, serp_data)
     t1 = time.perf_counter()
+    site_text = scraping_browser.fetch_site_text(homepage) if homepage else ""
+    browser_ms = int((time.perf_counter() - t1) * 1000)
+    if site_text:
+        log.info("Scraping Browser: %d chars from %s in %dms", len(site_text), homepage, browser_ms)
+    else:
+        log.info("Scraping Browser: unavailable — proceeding SERP-only")
+        browser_ms = 0
+
+    # 3. Assemble EVIDENCE_BUNDLE
+    bundle = assemble(
+        company=company,
+        serp_results=serp_data,
+        site_text=site_text,
+        site_url=homepage,
+    )
+    log.info("Bundle: %d web_evidence, %d founder_claims",
+             len(bundle.get("web_evidence", [])),
+             len(bundle.get("founder_claims", [])))
+
+    # 4. LLM triangulation synthesis
+    t2 = time.perf_counter()
     brief = complete_structured(
-        prompt=evidence,
+        prompt=f"EVIDENCE_BUNDLE:\n{json.dumps(bundle, indent=2)}",
         schema=Brief,
         system=SYSTEM_PROMPT,
     )
-    llm_ms = int((time.perf_counter() - t1) * 1000)
+    llm_ms = int((time.perf_counter() - t2) * 1000)
     source_count = len(brief.sources)
-    log.info("LLM: %d sources cited in %dms", source_count, llm_ms)
-    log.info("Total: %s", ScoutResult(brief=brief, serp_ms=serp_ms, llm_ms=llm_ms, source_count=source_count).stats_line())
+    log.info("LLM: %d sources cited, %d contradictions in %dms",
+             source_count, len(brief.contradictions), llm_ms)
 
-    return ScoutResult(brief=brief, serp_ms=serp_ms, llm_ms=llm_ms, source_count=source_count)
+    result = ScoutResult(
+        brief=brief,
+        serp_ms=serp_ms,
+        browser_ms=browser_ms,
+        llm_ms=llm_ms,
+        source_count=source_count,
+    )
+    log.info("Total: %s", result.stats_line())
+    return result
 
 
 def _insufficient_data_brief(company: str) -> Brief:
-    """Return a well-formed Brief when SERP finds nothing, rather than crashing."""
+    """Return a well-formed Brief when SERP finds nothing."""
     return Brief(
         company_name=company,
         one_liner="Insufficient public data to generate a brief.",
+        thesis="Cannot form a thesis without public evidence.",
         founders=[],
-        traction=TractionSignals(
-            summary="No public traction signals found via web search."
-        ),
+        traction=TractionSignals(summary="No public traction signals found via web search."),
         hiring=HiringSignals(summary="No public hiring data found."),
         competitive_positioning=CompetitivePositioning(
             market_segment="Unknown",
@@ -154,14 +205,6 @@ def _insufficient_data_brief(company: str) -> Brief:
             "No public information is available for this company. "
             "Cannot make an informed assessment without further context."
         ),
-    )
-
-
-def _format_evidence(company: str, serp_data) -> str:
-    """Stitch source outputs into a single prompt body."""
-    return (
-        f"Company: {company}\n\n"
-        f"--- SEARCH RESULTS (Bright Data SERP API) ---\n{serp_data}\n"
     )
 
 

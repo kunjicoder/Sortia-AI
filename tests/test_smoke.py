@@ -12,8 +12,8 @@ from __future__ import annotations
 
 def test_package_imports():
     import vc_scout  # noqa: F401
-    from vc_scout import config, llm, models, orchestrator  # noqa: F401
-    from vc_scout.sources import linkedin, serp, unlocker  # noqa: F401
+    from vc_scout import bundle, config, llm, models, orchestrator  # noqa: F401
+    from vc_scout.sources import linkedin, scraping_browser, serp, unlocker  # noqa: F401
 
 
 def test_brief_schema_round_trips():
@@ -30,6 +30,7 @@ def test_brief_schema_round_trips():
     brief = Brief(
         company_name="Acme AI",
         one_liner="LLM-powered acme detector",
+        thesis="Acme AI could own the industrial vision inspection market.",
         founders=[
             Founder(
                 name="Jane Doe",
@@ -71,6 +72,7 @@ def test_render_markdown_does_not_raise():
     brief = Brief(
         company_name="Acme AI",
         one_liner="LLM-powered acme detector",
+        thesis="Acme AI could own the industrial vision inspection market.",
         founders=[
             Founder(
                 name="Jane Doe",
