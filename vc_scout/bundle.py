@@ -34,6 +34,15 @@ from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 
+# ── Patterns that indicate a SERP snippet is from a junk page ───────────────
+# These snippets must not be used as the entity one_liner or web_evidence facts.
+_JUNK_SNIPPET_RE = re.compile(
+    r"(we[''']re hiring|join our team|exciting to work|open roles|job opening"
+    r"|cookie\s+policy|privacy\s+policy|all rights reserved|sign up|log in"
+    r"|subscribe to|newsletter)",
+    re.IGNORECASE,
+)
+
 # ── Keyword heuristics for derived_signals ──────────────────────────────────
 
 _FUNDING_RE = re.compile(
@@ -125,12 +134,9 @@ def _build_entity(
 ) -> dict[str, Any]:
     entity: dict[str, Any] = {"name": company}
 
-    # Best one_liner: first SERP description that's not boilerplate
-    for item in serp_results:
-        desc = (item.get("description") or "").strip()
-        if desc and len(desc) > 20 and "..." not in desc[:10]:
-            entity["one_liner"] = desc[:180]
-            break
+    # Intentionally do NOT put a one_liner in the entity — the LLM must
+    # synthesise it from web_evidence so it reads like an analyst description,
+    # not a copied careers-page quote.  (The SYSTEM_PROMPT enforces this rule.)
 
     domain = ""
     if site_url:
@@ -152,10 +158,16 @@ def _build_web_evidence(serp_results: list[dict[str, Any]]) -> list[dict[str, An
         fact = (item.get("description") or item.get("title") or "").strip()
         if not fact:
             continue
+        # Drop snippets that are clearly from careers/boilerplate pages
+        if _JUNK_SNIPPET_RE.search(fact):
+            log.debug("Skipping junk snippet: %.80s", fact)
+            continue
+        url = item.get("url", "")
         entry: dict[str, Any] = {
             "fact": fact[:300],
             "source_title": (item.get("title") or "").strip()[:120],
-            "url": item.get("url", ""),
+            "url": url,
+            "source_domain": urlparse(url).netloc.removeprefix("www.") if url else "",
         }
         if item.get("date"):
             entry["date"] = item["date"]

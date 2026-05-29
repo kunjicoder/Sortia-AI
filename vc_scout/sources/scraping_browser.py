@@ -38,10 +38,25 @@ def fetch_site_text(url: str) -> str:
         log.warning("BRIGHTDATA_BROWSER_URL not set — skipping Scraping Browser fetch")
         return ""
 
+    # Log a redacted view of the endpoint so we can see it's well-formed without
+    # leaking the password.
+    log.info("Scraping Browser: endpoint=%s", _redact(settings.brightdata_browser_url))
+
     try:
-        return _fetch(url, settings.brightdata_browser_url)
+        text = _fetch(url, settings.brightdata_browser_url)
+        log.info("Scraping Browser: OK — %d chars extracted from %s", len(text), url)
+        return text
+    except ImportError as exc:
+        log.error("Scraping Browser: Playwright not installed (%s). Run: pip install playwright", exc)
+        return ""
     except Exception as exc:
-        log.warning("Scraping Browser failed for %s: %s", url, exc)
+        # Full traceback + exception type so we can tell a bad endpoint from a
+        # navigation timeout from an auth/zone error.
+        log.error(
+            "Scraping Browser FAILED for %s — %s: %s",
+            url, type(exc).__name__, exc,
+            exc_info=True,
+        )
         return ""
 
 
@@ -51,13 +66,17 @@ def _fetch(page_url: str, browser_ws_url: str) -> str:
     texts: list[str] = []
 
     with sync_playwright() as p:
+        log.info("Scraping Browser: connecting over CDP…")
         browser = p.chromium.connect_over_cdp(browser_ws_url)
+        log.info("Scraping Browser: connected (contexts=%d)", len(browser.contexts))
         try:
             ctx = browser.contexts[0] if browser.contexts else browser.new_context()
             page = ctx.new_page()
 
             # Main page
+            log.info("Scraping Browser: navigating to %s", page_url)
             page.goto(page_url, wait_until="networkidle", timeout=30_000)
+            log.info("Scraping Browser: loaded %s", page.url)
             main_text = _extract_text(page)
             if main_text:
                 texts.append(f"[{page_url}]\n{main_text}")
@@ -95,6 +114,11 @@ def _extract_text(page) -> str:
         });
         return document.body ? document.body.innerText.trim() : '';
     }""")
+
+
+def _redact(ws_url: str) -> str:
+    """Mask the password in a wss://user:pass@host endpoint for safe logging."""
+    return re.sub(r"(://[^:]+:)[^@]+(@)", r"\1***\2", ws_url)
 
 
 def _same_domain(url_a: str, url_b: str) -> bool:
