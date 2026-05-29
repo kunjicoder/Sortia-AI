@@ -39,6 +39,8 @@ class Settings:
     brightdata_serp_zone: str = ""
     brightdata_unlocker_zone: str = ""
     brightdata_scraper_zone: str = ""
+    # Scraping Browser CDP endpoint — wss://brd-customer-...@brd.superproxy.io:9222
+    brightdata_browser_url: str = ""
 
     # App
     use_demo_cache: bool = False
@@ -60,6 +62,7 @@ def load_settings() -> Settings:
         brightdata_serp_zone=_env("BRIGHTDATA_SERP_ZONE"),
         brightdata_unlocker_zone=_env("BRIGHTDATA_UNLOCKER_ZONE"),
         brightdata_scraper_zone=_env("BRIGHTDATA_SCRAPER_ZONE"),
+        brightdata_browser_url=_env("BRIGHTDATA_BROWSER_URL"),
         use_demo_cache=_env("USE_DEMO_CACHE", "false").lower() == "true",
         log_level=_env("LOG_LEVEL", "INFO"),
     )
