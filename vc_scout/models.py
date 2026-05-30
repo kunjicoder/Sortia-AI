@@ -28,8 +28,8 @@ class EvidencePoint(BaseModel):
 
 
 class Founder(BaseModel):
-    name: str
-    role: str = Field(description="e.g. 'CEO & Co-founder'")
+    name: Optional[str] = None
+    role: Optional[str] = Field(default=None, description="e.g. 'CEO & Co-founder'")
     university: Optional[str] = Field(default=None, description="Only if found in evidence; never guess")
     prior_companies: List[str] = Field(default_factory=list, description="Named only if in evidence")
     prior_exits_or_scaling: Optional[str] = Field(default=None, description="e.g. 'co-founded X (acq. 2021)'; null if not in evidence")
@@ -46,7 +46,7 @@ class MemoSection(BaseModel):
 
 
 class FundingRound(BaseModel):
-    round: str = Field(description="e.g. 'Seed', 'Series A'")
+    round: Optional[str] = Field(default=None, description="e.g. 'Seed', 'Series A'")
     amount: Optional[str] = None
     date: Optional[str] = None
     investors: List[str] = Field(default_factory=list)
@@ -111,6 +111,16 @@ class InvestmentMemo(BaseModel):
     competition: Optional[MemoSection] = None
     funding: List[FundingRound] = Field(default_factory=list)
     hiring_gtm: Optional[MemoSection] = None
+
+    @field_validator("funding")
+    @classmethod
+    def _filter_empty_funding(cls, v: list) -> list:
+        return [r for r in v if r.round]
+
+    @field_validator("team")
+    @classmethod
+    def _filter_empty_team(cls, v: list) -> list:
+        return [f for f in v if f.name]
 
     # Verdict machinery
     decision_drivers: List[ScoreDriver] = Field(

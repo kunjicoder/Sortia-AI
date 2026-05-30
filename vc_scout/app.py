@@ -74,7 +74,7 @@ def _trunc(text: str, max_len: int) -> str:
 def _pill(text: str, fg: str, bg: str) -> str:
     return (
         f'<span style="display:inline-block;padding:2px 8px;border-radius:999px;'
-        f'font-size:0.78em;font-weight:600;color:{fg};background:{bg};'
+        f'font-size:0.78em;font-weight:600;color:{fg} !important;background:{bg} !important;'
         f'letter-spacing:0.3px;white-space:nowrap">{text}</span>'
     )
 
@@ -103,12 +103,12 @@ def _source_chip(label: str, active: bool) -> str:
     if active:
         return (
             f'<span style="display:inline-block;padding:4px 12px;border-radius:999px;'
-            f'background:{_NAVY};color:#fff;font-size:0.8em;font-weight:600;margin:3px 2px;">'
+            f'background:{_NAVY} !important;color:#fff !important;font-size:0.8em;font-weight:600;margin:3px 2px;">'
             f'{label}</span>'
         )
     return (
         f'<span style="display:inline-block;padding:4px 12px;border-radius:999px;'
-        f'background:#F0F2F8;color:#B0B8CC;font-size:0.8em;font-weight:500;margin:3px 2px;">'
+        f'background:#F0F2F8 !important;color:#B0B8CC !important;font-size:0.8em;font-weight:500;margin:3px 2px;">'
         f'{label}</span>'
     )
 
@@ -221,15 +221,15 @@ def _render_markdown(result: ScoutResult) -> str:
         f'{one_liner_html}'
         f'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
         f'<span style="display:inline-block;padding:8px 20px;border-radius:8px;'
-        f'background:{color};color:#fff;font-weight:bold;font-size:1.1em;">{label}</span>'
+        f'background:{color} !important;color:#fff !important;font-weight:bold;font-size:1.1em;">{label}</span>'
         f'<span style="display:inline-block;padding:5px 12px;border-radius:6px;'
-        f'background:{conv_color};color:#fff;font-size:0.85em;font-weight:600;">'
+        f'background:{conv_color} !important;color:#fff !important;font-size:0.85em;font-weight:600;">'
         f'{conviction} conviction</span>'
         f'</div></div>'
     )
 
     # ── 2. Executive summary ──────────────────────────────────────────────────
-    lines += ["## Executive Summary", "", memo.executive_summary, ""]
+    lines += ["", "## Executive Summary", "", memo.executive_summary, ""]
     lines.append(f"**Rationale:** {memo.recommendation_rationale}")
     lines.append("")
     lines.append("---")
@@ -262,7 +262,7 @@ def _render_markdown(result: ScoutResult) -> str:
             lines.append(f"> {d.rationale}")
             for ep in d.supporting_evidence:
                 tp = _trust_pill(ep.trust)
-                lines.append(f"> {tp} *{ep.fact[:120]}* — [{ep.source}]({ep.url})")
+                lines.append(f"> - {tp} *{ep.fact[:120]}* — [{ep.source}]({ep.url})")
             lines.append("")
 
     lines.append("---")
@@ -397,9 +397,62 @@ def _render_markdown(result: ScoutResult) -> str:
     return "\n".join(line for line in lines if line is not None)
 
 
-def build_ui() -> gr.Blocks:
-    css = """
-.gradio-container { max-width: 980px; margin: auto; padding: 1.5rem; }
+# ── Theme + CSS (Gradio 6: pass theme/css to launch(), not Blocks) ───────────
+
+_PAGE = "#F5F7FC"
+
+_THEME = (
+    gr.themes.Soft(primary_hue="blue", neutral_hue="gray")
+    .set(
+        body_background_fill=_PAGE,
+        body_background_fill_dark=_PAGE,
+        body_text_color=_INK,
+        body_text_color_dark=_INK,
+        body_text_color_subdued="#4B5563",
+        body_text_color_subdued_dark="#4B5563",
+        background_fill_primary=_PAGE,
+        background_fill_primary_dark=_PAGE,
+        background_fill_secondary="white",
+        background_fill_secondary_dark="white",
+        block_background_fill="white",
+        block_background_fill_dark="white",
+        block_label_text_color=_INK,
+        block_label_text_color_dark=_INK,
+        block_label_background_fill="#EFF3F8",
+        block_label_background_fill_dark="#EFF3F8",
+        block_title_text_color=_INK,
+        block_title_text_color_dark=_INK,
+        block_info_text_color="#4B5563",
+        block_info_text_color_dark="#4B5563",
+        input_background_fill="white",
+        input_background_fill_dark="white",
+        input_background_fill_focus="white",
+        input_background_fill_focus_dark="white",
+        input_border_color="#D1D5DB",
+        input_border_color_dark="#D1D5DB",
+        accordion_text_color=_INK,
+        accordion_text_color_dark=_INK,
+        table_text_color=_INK,
+        table_text_color_dark=_INK,
+        button_secondary_text_color=_INK,
+        button_secondary_text_color_dark=_INK,
+        button_secondary_text_color_hover="#4B5563",
+        button_secondary_text_color_hover_dark="#4B5563",
+        button_secondary_background_fill="white",
+        button_secondary_background_fill_dark="white",
+        checkbox_label_text_color=_INK,
+        checkbox_label_text_color_dark=_INK,
+        link_text_color="#2A3A8C",
+        link_text_color_dark="#2A3A8C",
+    )
+)
+
+
+def _build_css() -> str:
+    return """
+:root { color-scheme: light; }
+
+.gradio-container { max-width: 980px; margin: auto; padding: 1.5rem; color: #1A1F36 !important; background: #F5F7FC !important; }
 .main-header { background: linear-gradient(135deg, #1E2761 0%, #2A3A8C 100%); padding: 2rem; border-radius: 1rem; margin-bottom: 2rem; color: white; }
 .verdict-badge { display: inline-block; padding: 0.25rem 1rem; border-radius: 2rem; font-weight: bold; margin-bottom: 1rem; }
 .driver-bar { background: #EFF3F8; border-radius: 0.5rem; height: 0.5rem; margin: 0.5rem 0; }
@@ -407,10 +460,41 @@ def build_ui() -> gr.Blocks:
 .insight-block { background: #F8F9FC; border-left: 4px solid #1F9D6B; padding: 1rem; margin: 1rem 0; }
 .source-chip { background: #EFF3F8; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; display: inline-block; margin: 0.2rem; }
 
-body, .gradio-container, .main { background: #F5F7FC; color: #1A1F36; }
-label, p, h1, h2, h3, h4, .prose { color: #1A1F36 !important; }
-.gr-box, .gr-form, .gr-panel { background: white; color: #1A1F36; }
-input, textarea { background: white; color: #1A1F36; border: 1px solid #D1D5DB; }
+/* Base contrast — light backgrounds, dark text everywhere */
+.gradio-container, .main, .contain, .block, .gr-box, .gr-form, .gr-panel {
+  background: #F5F7FC;
+  color: #1A1F36 !important;
+}
+.block { background: white !important; }
+label, p, span, li, td, th, h1, h2, h3, h4, h5, h6, .prose, .md, .label-wrap, .block-label {
+  color: #1A1F36 !important;
+}
+input, textarea, select {
+  background: white !important;
+  color: #1A1F36 !important;
+  border: 1px solid #D1D5DB !important;
+}
+input::placeholder, textarea::placeholder { color: #6B7280 !important; opacity: 1 !important; }
+
+/* Override Gradio OS dark-mode (.dark class) */
+.dark .gradio-container,
+.dark .gradio-container .contain,
+.dark .block,
+.dark label, .dark p, .dark span, .dark li,
+.dark h1, .dark h2, .dark h3, .dark h4,
+.dark .md, .dark .prose, .dark .label-wrap {
+  color: #1A1F36 !important;
+}
+.dark input, .dark textarea, .dark select {
+  background: white !important;
+  color: #1A1F36 !important;
+}
+@media (prefers-color-scheme: dark) {
+  .gradio-container, .block, .contain { background: #F5F7FC !important; color: #1A1F36 !important; }
+  .block { background: white !important; }
+  label, p, span, .md, input, textarea { color: #1A1F36 !important; }
+  input, textarea { background: white !important; }
+}
 
 #vcs-header {
   background: linear-gradient(135deg, #1E2761 0%, #2A3A8C 100%);
@@ -425,36 +509,41 @@ input, textarea { background: white; color: #1A1F36; border: 1px solid #D1D5DB; 
   letter-spacing: 0.4px;
 }
 
-#vcs-controls { background: white; border: 1px solid #D1D5DB; border-radius: 14px; padding: 16px 18px; }
+#vcs-controls { background: white !important; border: 1px solid #D1D5DB; border-radius: 14px; padding: 16px 18px; }
+#vcs-controls label, #vcs-controls span { color: #1A1F36 !important; }
 #vcs-btn button {
   background: #1E2761 !important; border: none !important; color: #fff !important;
   font-weight: 700 !important; border-radius: 10px !important; letter-spacing: 0.3px;
 }
 #vcs-btn button:hover { background: #2A3A8C !important; }
 
+#vcs-output, #vcs-output .md, #vcs-output .prose {
+  background: white !important;
+  color: #1A1F36 !important;
+}
 #vcs-output {
-  background: white; border: 1px solid #E8ECF6; border-radius: 16px;
+  border: 1px solid #E8ECF6; border-radius: 16px;
   padding: 30px 34px; margin-top: 18px; box-shadow: 0 4px 18px rgba(30,39,97,0.06);
-  line-height: 1.6; color: #1A1F36;
+  line-height: 1.6;
 }
 #vcs-output h1 { color: #1A1F36 !important; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 2px; }
 #vcs-output h2 { color: #1E2761 !important; font-weight: 700; margin-top: 26px; font-size: 1.25em; }
 #vcs-output h3 { color: #1E2761 !important; font-weight: 700; }
-#vcs-output p, #vcs-output li, #vcs-output td { color: #1A1F36 !important; }
-#vcs-output a { color: #2A3A8C; text-decoration: none; border-bottom: 1px solid #CADCFC; }
+#vcs-output p, #vcs-output li, #vcs-output td, #vcs-output strong, #vcs-output em { color: #1A1F36 !important; }
+#vcs-output a { color: #2A3A8C !important; text-decoration: none; border-bottom: 1px solid #CADCFC; }
 #vcs-output a:hover { border-bottom-color: #2A3A8C; }
 #vcs-output hr { border: none; border-top: 1px solid #EDF0F8; margin: 28px 0; }
 #vcs-output blockquote {
-  border-left: 3px solid #CADCFC; background: #F8FAFE; margin: 6px 0;
+  border-left: 3px solid #CADCFC; background: #F8FAFE !important; margin: 6px 0;
   padding: 8px 16px; color: #3A4154 !important; border-radius: 0 8px 8px 0;
 }
 #vcs-output table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 0.92em; }
-#vcs-output th { background: #1E2761; color: #fff !important; text-align: left; padding: 10px 12px; font-weight: 600; }
+#vcs-output th { background: #1E2761 !important; color: #fff !important; text-align: left; padding: 10px 12px; font-weight: 600; }
 #vcs-output td { padding: 10px 12px; border-bottom: 1px solid #EDF0F8; vertical-align: top;
-  white-space: normal; word-break: break-word; color: #1A1F36 !important; }
-#vcs-output tr:nth-child(even) td { background: #FAFBFE; }
+  white-space: normal; word-break: break-word; color: #1A1F36 !important; background: white !important; }
+#vcs-output tr:nth-child(even) td { background: #FAFBFE !important; }
 #vcs-output details {
-  border: 1px solid #E8ECF6; border-radius: 12px; padding: 8px 16px; margin-top: 18px; background: #FBFCFE;
+  border: 1px solid #E8ECF6; border-radius: 12px; padding: 8px 16px; margin-top: 18px; background: #FBFCFE !important;
 }
 #vcs-output summary { cursor: pointer; color: #1E2761 !important; padding: 6px 0; }
 
@@ -470,11 +559,10 @@ input, textarea { background: white; color: #1A1F36; border: 1px solid #D1D5DB; 
   font-size: 1.05em; font-weight: 600;
 }
 """
-    with gr.Blocks(
-        title="VC Scout",
-        theme=gr.themes.Soft(primary_hue="blue", neutral_hue="gray"),
-        css=css,
-    ) as ui:
+
+
+def build_ui() -> gr.Blocks:
+    with gr.Blocks(title="VC Scout") as ui:
         gr.HTML(
             '<div id="vcs-header">'
             '<h1>VC Scout</h1>'
@@ -493,7 +581,7 @@ input, textarea { background: white; color: #1A1F36; border: 1px solid #D1D5DB; 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    build_ui().launch()
+    build_ui().launch(theme=_THEME, css=_build_css())
 
 
 if __name__ == "__main__":
