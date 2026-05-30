@@ -397,89 +397,84 @@ def _render_markdown(result: ScoutResult) -> str:
     return "\n".join(line for line in lines if line is not None)
 
 
-# ── Theme + CSS ───────────────────────────────────────────────────────────────
+def build_ui() -> gr.Blocks:
+    css = """
+.gradio-container { max-width: 980px; margin: auto; padding: 1.5rem; }
+.main-header { background: linear-gradient(135deg, #1E2761 0%, #2A3A8C 100%); padding: 2rem; border-radius: 1rem; margin-bottom: 2rem; color: white; }
+.verdict-badge { display: inline-block; padding: 0.25rem 1rem; border-radius: 2rem; font-weight: bold; margin-bottom: 1rem; }
+.driver-bar { background: #EFF3F8; border-radius: 0.5rem; height: 0.5rem; margin: 0.5rem 0; }
+.driver-fill { background: #1F9D6B; border-radius: 0.5rem; height: 100%; width: 0%; }
+.insight-block { background: #F8F9FC; border-left: 4px solid #1F9D6B; padding: 1rem; margin: 1rem 0; }
+.source-chip { background: #EFF3F8; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; display: inline-block; margin: 0.2rem; }
 
-_THEME = gr.themes.Soft(
-    primary_hue=gr.themes.colors.indigo,
-    secondary_hue=gr.themes.colors.slate,
-    neutral_hue=gr.themes.colors.slate,
-    font=[gr.themes.GoogleFont("Inter"), "system-ui", "sans-serif"],
-)
+body, .gradio-container, .main { background: #F5F7FC; color: #1A1F36; }
+label, p, h1, h2, h3, h4, .prose { color: #1A1F36 !important; }
+.gr-box, .gr-form, .gr-panel { background: white; color: #1A1F36; }
+input, textarea { background: white; color: #1A1F36; border: 1px solid #D1D5DB; }
 
-_CSS = """
-.gradio-container { max-width: 940px !important; margin: 0 auto !important; }
-
-/* Header band */
 #vcs-header {
-  background: linear-gradient(135deg, #1E2761 0%, #2A3A7A 100%);
-  border-radius: 16px; padding: 26px 30px; margin-bottom: 18px;
+  background: linear-gradient(135deg, #1E2761 0%, #2A3A8C 100%);
+  border-radius: 1rem; padding: 2rem; margin-bottom: 2rem;
   box-shadow: 0 6px 20px rgba(30,39,97,0.18);
 }
-#vcs-header h1 { color:#fff; margin:0; font-size:1.9em; font-weight:800; letter-spacing:-0.5px; }
-#vcs-header p { color:#CADCFC; margin:6px 0 0; font-size:1.02em; }
+#vcs-header h1 { color: #fff !important; margin: 0; font-size: 1.9em; font-weight: 800; letter-spacing: -0.5px; }
+#vcs-header p { color: #CADCFC !important; margin: 6px 0 0; font-size: 1.02em; }
 #vcs-header .pill {
-  display:inline-block; margin-top:14px; padding:5px 14px; border-radius:999px;
-  background:rgba(255,255,255,0.12); color:#fff; font-size:0.8em; font-weight:600;
-  letter-spacing:0.4px;
+  display: inline-block; margin-top: 14px; padding: 5px 14px; border-radius: 999px;
+  background: rgba(255,255,255,0.12); color: #fff !important; font-size: 0.8em; font-weight: 600;
+  letter-spacing: 0.4px;
 }
 
-/* Input row + button */
-#vcs-controls { background:#F4F6FC; border:1px solid #E2E8F5; border-radius:14px; padding:16px 18px; }
+#vcs-controls { background: white; border: 1px solid #D1D5DB; border-radius: 14px; padding: 16px 18px; }
 #vcs-btn button {
-  background:#1E2761 !important; border:none !important; color:#fff !important;
-  font-weight:700 !important; border-radius:10px !important; letter-spacing:0.3px;
+  background: #1E2761 !important; border: none !important; color: #fff !important;
+  font-weight: 700 !important; border-radius: 10px !important; letter-spacing: 0.3px;
 }
-#vcs-btn button:hover { background:#2A3A7A !important; }
+#vcs-btn button:hover { background: #2A3A8C !important; }
 
-/* Memo output card */
 #vcs-output {
-  background:#fff; border:1px solid #E8ECF6; border-radius:16px;
-  padding:30px 34px; margin-top:18px; box-shadow:0 4px 18px rgba(30,39,97,0.06);
-  line-height:1.6;
+  background: white; border: 1px solid #E8ECF6; border-radius: 16px;
+  padding: 30px 34px; margin-top: 18px; box-shadow: 0 4px 18px rgba(30,39,97,0.06);
+  line-height: 1.6; color: #1A1F36;
 }
-#vcs-output h1 { color:#1A1F36; font-weight:800; letter-spacing:-0.5px; margin-bottom:2px; }
-#vcs-output h2 { color:#1E2761; font-weight:700; margin-top:26px; font-size:1.25em; }
-#vcs-output h3 { color:#1E2761; font-weight:700; }
-#vcs-output a { color:#2A3A7A; text-decoration:none; border-bottom:1px solid #CADCFC; }
-#vcs-output a:hover { border-bottom-color:#2A3A7A; }
-#vcs-output hr { border:none; border-top:1px solid #EDF0F8; margin:28px 0; }
-
-/* Blockquotes = driver rationales */
+#vcs-output h1 { color: #1A1F36 !important; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 2px; }
+#vcs-output h2 { color: #1E2761 !important; font-weight: 700; margin-top: 26px; font-size: 1.25em; }
+#vcs-output h3 { color: #1E2761 !important; font-weight: 700; }
+#vcs-output p, #vcs-output li, #vcs-output td { color: #1A1F36 !important; }
+#vcs-output a { color: #2A3A8C; text-decoration: none; border-bottom: 1px solid #CADCFC; }
+#vcs-output a:hover { border-bottom-color: #2A3A8C; }
+#vcs-output hr { border: none; border-top: 1px solid #EDF0F8; margin: 28px 0; }
 #vcs-output blockquote {
-  border-left:3px solid #CADCFC; background:#F8FAFE; margin:6px 0;
-  padding:8px 16px; color:#3A4154; border-radius:0 8px 8px 0;
+  border-left: 3px solid #CADCFC; background: #F8FAFE; margin: 6px 0;
+  padding: 8px 16px; color: #3A4154 !important; border-radius: 0 8px 8px 0;
 }
-
-/* Research-log table: wrap, don't clip */
-#vcs-output table { border-collapse:collapse; width:100%; margin:10px 0; font-size:0.92em; }
-#vcs-output th { background:#1E2761; color:#fff; text-align:left; padding:10px 12px; font-weight:600; }
-#vcs-output td { padding:10px 12px; border-bottom:1px solid #EDF0F8; vertical-align:top;
-  white-space:normal; word-break:break-word; }
-#vcs-output tr:nth-child(even) td { background:#FAFBFE; }
-
-/* Collapsible full-detail */
+#vcs-output table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 0.92em; }
+#vcs-output th { background: #1E2761; color: #fff !important; text-align: left; padding: 10px 12px; font-weight: 600; }
+#vcs-output td { padding: 10px 12px; border-bottom: 1px solid #EDF0F8; vertical-align: top;
+  white-space: normal; word-break: break-word; color: #1A1F36 !important; }
+#vcs-output tr:nth-child(even) td { background: #FAFBFE; }
 #vcs-output details {
-  border:1px solid #E8ECF6; border-radius:12px; padding:8px 16px; margin-top:18px; background:#FBFCFE;
+  border: 1px solid #E8ECF6; border-radius: 12px; padding: 8px 16px; margin-top: 18px; background: #FBFCFE;
 }
-#vcs-output summary { cursor:pointer; color:#1E2761; padding:6px 0; }
+#vcs-output summary { cursor: pointer; color: #1E2761 !important; padding: 6px 0; }
 
-/* Loading spinner */
 @keyframes vcs-spin { to { transform: rotate(360deg); } }
 .vcs-spinner {
-  display:inline-block; width:18px; height:18px;
-  border:3px solid #E2E8F5; border-top-color:#1E2761;
-  border-radius:50%; animation:vcs-spin 0.8s linear infinite;
-  vertical-align:middle; margin-right:10px;
+  display: inline-block; width: 18px; height: 18px;
+  border: 3px solid #E2E8F5; border-top-color: #1E2761;
+  border-radius: 50%; animation: vcs-spin 0.8s linear infinite;
+  vertical-align: middle; margin-right: 10px;
 }
 .vcs-loading {
-  text-align:center; padding:40px 0; color:#1E2761;
-  font-size:1.05em; font-weight:600;
+  text-align: center; padding: 40px 0; color: #1E2761 !important;
+  font-size: 1.05em; font-weight: 600;
 }
 """
-
-
-def build_ui() -> gr.Blocks:
-    with gr.Blocks(title="VC Scout", theme=_THEME, css=_CSS) as ui:
+    with gr.Blocks(
+        title="VC Scout",
+        theme=gr.themes.Soft(primary_hue="blue", neutral_hue="gray"),
+        css=css,
+    ) as ui:
         gr.HTML(
             '<div id="vcs-header">'
             '<h1>VC Scout</h1>'
