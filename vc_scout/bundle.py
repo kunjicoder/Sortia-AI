@@ -69,6 +69,8 @@ def assemble(
     serp_results: list[dict[str, Any]],
     site_text: str,
     site_url: str = "",
+    linkedin_signals: dict[str, Any] | None = None,
+    ats_signals: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return the EVIDENCE_BUNDLE dict for the triangulation prompt."""
     entity = _build_entity(company, serp_results, site_url)
@@ -84,14 +86,44 @@ def assemble(
         bundle["founder_claims"] = founder_claims
     if derived:
         bundle["derived_signals"] = derived
+    if linkedin_signals:
+        # Independent third-party structured data from LinkedIn — a source no LLM
+        # tool can reach. Corroborating signal, NOT ground truth (see prompt caveat).
+        bundle["linkedin_signals"] = linkedin_signals
+    if ats_signals:
+        # Role-level hiring intent from the company's own ATS (Ashby/Greenhouse/
+        # Lever) — leading GTM signal, the company's live pipeline.
+        bundle["hiring_signals"] = ats_signals
 
     log.info(
-        "Bundle assembled: %d web_evidence, %d founder_claims, derived=%s",
+        "Bundle assembled: %d web_evidence, %d founder_claims, derived=%s, linkedin=%s",
         len(web_evidence),
         len(founder_claims),
         list(derived.keys()),
+        bool(linkedin_signals),
     )
     return bundle
+
+
+def find_linkedin_company_url(serp_results: list[dict[str, Any]]) -> str:
+    """Return the first linkedin.com/company/... URL found in SERP results, else ''."""
+    for item in serp_results:
+        url = item.get("url", "")
+        if "linkedin.com/company/" in url.lower():
+            return url.split("?")[0]
+    return ""
+
+
+_ATS_URL_RE = re.compile(r"(ashbyhq\.com|greenhouse\.io|lever\.co|jobs\.[a-z0-9-]+\.|/careers)", re.I)
+
+
+def find_careers_url(serp_results: list[dict[str, Any]]) -> str:
+    """Return the first ATS/careers URL found in SERP results, else ''."""
+    for item in serp_results:
+        url = item.get("url", "")
+        if url and _ATS_URL_RE.search(url):
+            return url.split("?")[0]
+    return ""
 
 
 def find_homepage(company: str, serp_results: list[dict[str, Any]]) -> str:

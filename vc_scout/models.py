@@ -21,7 +21,7 @@ class Recommendation(str, Enum):
 class Founder(BaseModel):
     name: str
     role: str = Field(description="e.g. 'CEO & Co-founder'")
-    background: str = Field(description="2-3 sentence summary of prior work and education")
+    background: str = Field(description="2-3 sentence summary; only what evidence supports")
     linkedin_url: Optional[str] = None
     notable_priors: List[str] = Field(default_factory=list, description="Companies, schools, achievements")
 
@@ -34,7 +34,6 @@ class TractionSignals(BaseModel):
     producthunt_rank: Optional[str] = None
     twitter_followers: Optional[int] = None
     summary: str = Field(description="One-paragraph synthesis of overall traction")
-
 
 
 class HiringSignals(BaseModel):
@@ -78,45 +77,105 @@ class Contradiction(BaseModel):
     is_contradiction: bool = Field(description="true if contradicts, false if supports/corroborates")
 
 
+class EvidencePoint(BaseModel):
+    """A single cited fact backing a score driver."""
+    fact: str = Field(description="The specific quoted fact from the source")
+    url: str
+    source_type: str = Field(description="serp | site | linkedin | ats")
+
+
 class ScoreDriver(BaseModel):
     name: str = Field(description="Asymmetry | Defensibility | Timing | Founder grit")
     score: int = Field(ge=1, le=10)
-    rationale: str = Field(description="One sentence justification naming the evidence")
+    rationale: str = Field(description="1-2 sentences quoting the specific fact behind the score")
     evidence_url: str = Field(default="", description="Primary URL supporting this score")
     confidence: str = Field(description="High | Medium | Low")
+    supporting_evidence: List[EvidencePoint] = Field(
+        default_factory=list,
+        description="1-3 cited facts backing the score",
+    )
+
+
+class Market(BaseModel):
+    """Market context — omit or null fields that have no evidence."""
+    segment: str
+    sizing_note: Optional[str] = Field(default=None, description="TAM/SAM only if a size figure appears in evidence")
+    tailwinds: List[str] = Field(default_factory=list, description="Short phrases grounded in evidence")
+    headwinds: List[str] = Field(default_factory=list, description="Short phrases grounded in evidence")
+    competitors: List[str] = Field(default_factory=list, description="Named only if they appear in a snippet")
+
+
+class ResearchStep(BaseModel):
+    """One entry per source actually consulted — shows the brief's work."""
+    source: str = Field(description="SERP API | Scraping Browser | LinkedIn | ATS")
+    examined: str = Field(description="What URL or data type was looked at")
+    found: str = Field(description="What came back, or 'No data returned'")
+    inference: str = Field(description="Investor-relevant takeaway, or 'Inconclusive'")
+
+
+class DataCompleteness(BaseModel):
+    """Honest map of which sources contributed data."""
+    serp: bool
+    company_site: bool
+    linkedin: bool
+    ats: bool
+    notes: str = Field(default="", description="Gaps and how they limit confidence")
 
 
 class Brief(BaseModel):
     company_name: str
-    one_liner: str
-    thesis: str = Field(description="Investment thesis in one sentence")
-    founders: List[Founder]
+    one_liner: str = Field(description="10-15 word analyst description of what the company does and for whom")
+    overview: str = Field(
+        default="",
+        description="2-4 sentence analyst summary: what / who for / apparent stage",
+    )
+    thesis: str = Field(description="Falsifiable investment thesis in one sentence")
+    recommendation: Recommendation
+    conviction: str = Field(
+        default="Medium",
+        description="High | Medium | Low — confidence in the verdict itself",
+    )
+    recommendation_rationale: str = Field(
+        description="Walk from driver scores + decisive evidence to the verdict"
+    )
+    founders: List[Founder] = Field(default_factory=list)
+    market: Optional[Market] = Field(default=None, description="Market context from evidence")
     traction: TractionSignals
     hiring: HiringSignals
     recent_press: List[PressItem] = Field(default_factory=list)
     funding_history: List[FundingRound] = Field(default_factory=list)
     competitive_positioning: CompetitivePositioning
-    red_flags: List[RedFlag] = Field(default_factory=list)
+    decision_drivers: List[ScoreDriver] = Field(
+        default_factory=list,
+        description="Exactly 4 scored drivers: Asymmetry, Defensibility, Timing, Founder grit",
+    )
     contradictions: List[Contradiction] = Field(
         default_factory=list,
         description="Claims from the company site cross-checked against independent web evidence",
     )
-    decision_drivers: List[ScoreDriver] = Field(
-        default_factory=list,
-        description="Scored drivers: Asymmetry, Defensibility, Timing, Founder grit",
-    )
     failure_paths: List[str] = Field(
         default_factory=list,
-        description="3 likeliest ways this company fails",
+        description="3 company-specific failure paths",
+    )
+    diligence_questions: List[str] = Field(
+        default_factory=list,
+        description="3-5 sharp questions for the founder targeting gaps/risks/unverified claims",
     )
     hidden_insight: Optional[str] = Field(
         default=None,
-        description="Non-obvious signal grounded in a specific piece of evidence",
+        description="Inference connecting two cited facts; introduces no new named entity",
     )
     next_action: Optional[str] = Field(
         default=None,
         description="The one thing a human must do that the system can't",
     )
-    recommendation: Recommendation
-    recommendation_rationale: str = Field(description="Why this recommendation, in 2-3 sentences")
+    research_log: List[ResearchStep] = Field(
+        default_factory=list,
+        description="One step per source actually used — shows the research trail",
+    )
+    data_completeness: Optional[DataCompleteness] = Field(
+        default=None,
+        description="Which sources returned data and known gaps",
+    )
+    red_flags: List[RedFlag] = Field(default_factory=list)
     sources: List[str] = Field(default_factory=list, description="URLs referenced during synthesis")

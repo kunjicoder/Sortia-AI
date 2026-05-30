@@ -13,7 +13,7 @@ from __future__ import annotations
 def test_package_imports():
     import vc_scout  # noqa: F401
     from vc_scout import bundle, config, llm, models, orchestrator  # noqa: F401
-    from vc_scout.sources import linkedin, scraping_browser, serp, unlocker  # noqa: F401
+    from vc_scout.sources import linkedin, scraping_browser, serp, ats  # noqa: F401
 
 
 def test_brief_schema_round_trips():
@@ -21,8 +21,10 @@ def test_brief_schema_round_trips():
     from vc_scout.models import (
         Brief,
         CompetitivePositioning,
+        DataCompleteness,
         Founder,
         HiringSignals,
+        Market,
         Recommendation,
         TractionSignals,
     )
@@ -30,7 +32,7 @@ def test_brief_schema_round_trips():
     brief = Brief(
         company_name="Acme AI",
         one_liner="LLM-powered acme detector",
-        thesis="Acme AI could own the industrial vision inspection market.",
+        thesis="Acme AI could be the first industrial vision company to reach 10× ARR on a focused wedge.",
         founders=[
             Founder(
                 name="Jane Doe",
@@ -44,6 +46,8 @@ def test_brief_schema_round_trips():
             market_segment="Applied AI",
             differentiation="Vertical focus on industrial vision.",
         ),
+        market=Market(segment="Industrial AI", tailwinds=["Automation demand"]),
+        data_completeness=DataCompleteness(serp=True, company_site=False, linkedin=False, ats=False),
         recommendation=Recommendation.DIG_DEEPER,
         recommendation_rationale="Strong team, unclear traction signal yet.",
     )
@@ -62,8 +66,10 @@ def test_render_markdown_does_not_raise():
     from vc_scout.models import (
         Brief,
         CompetitivePositioning,
+        DataCompleteness,
         Founder,
         HiringSignals,
+        Market,
         Recommendation,
         TractionSignals,
     )
@@ -72,7 +78,7 @@ def test_render_markdown_does_not_raise():
     brief = Brief(
         company_name="Acme AI",
         one_liner="LLM-powered acme detector",
-        thesis="Acme AI could own the industrial vision inspection market.",
+        thesis="Acme AI could be the first industrial vision company to reach 10× ARR on a focused wedge.",
         founders=[
             Founder(
                 name="Jane Doe",
@@ -86,11 +92,13 @@ def test_render_markdown_does_not_raise():
             market_segment="Applied AI",
             differentiation="Vertical focus on industrial vision.",
         ),
+        market=Market(segment="Industrial AI"),
+        data_completeness=DataCompleteness(serp=True, company_site=False, linkedin=False, ats=False),
         recommendation=Recommendation.DIG_DEEPER,
         recommendation_rationale="Strong team, unclear traction signal yet.",
     )
     scout_result = ScoutResult(brief=brief, serp_ms=1200, llm_ms=5800, source_count=4)
     result = _render_markdown(scout_result)
     assert "Acme AI" in result
-    assert any(s in result for s in ("DIG_DEEPER", "dig_deeper", "DIG DEEPER"))
+    assert any(s in result for s in ("DIG_DEEPER", "dig_deeper", "DIG DEEPER", "SECOND LOOK"))
     assert "sources read" in result
