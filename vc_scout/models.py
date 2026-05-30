@@ -140,11 +140,11 @@ class Brief(BaseModel):
     )
     founders: List[Founder] = Field(default_factory=list)
     market: Optional[Market] = Field(default=None, description="Market context from evidence")
-    traction: TractionSignals
-    hiring: HiringSignals
+    traction: Optional[TractionSignals] = None
+    hiring: Optional[HiringSignals] = None
     recent_press: List[PressItem] = Field(default_factory=list)
     funding_history: List[FundingRound] = Field(default_factory=list)
-    competitive_positioning: CompetitivePositioning
+    competitive_positioning: Optional[CompetitivePositioning] = None
     decision_drivers: List[ScoreDriver] = Field(
         default_factory=list,
         description="Exactly 4 scored drivers: Asymmetry, Defensibility, Timing, Founder grit",

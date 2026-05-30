@@ -209,16 +209,18 @@ def _render_markdown(result: ScoutResult) -> str:
         detail_lines.append("*No founder data found in public sources.*")
     detail_lines.append("")
 
-    detail_lines += ["### Traction", "", brief.traction.summary]
-    if brief.traction.github_url:
-        detail_lines.append(f"**GitHub:** {brief.traction.github_url}")
-    if brief.traction.hn_mentions:
-        detail_lines.append("**HN:** " + " · ".join(brief.traction.hn_mentions))
-    detail_lines.append("")
+    if brief.traction:
+        detail_lines += ["### Traction", "", brief.traction.summary]
+        if brief.traction.github_url:
+            detail_lines.append(f"**GitHub:** {brief.traction.github_url}")
+        if brief.traction.hn_mentions:
+            detail_lines.append("**HN:** " + " · ".join(brief.traction.hn_mentions))
+        detail_lines.append("")
 
-    detail_lines += ["### Hiring", "", brief.hiring.summary]
-    if brief.hiring.open_roles:
-        detail_lines.append(f"**Open roles:** {brief.hiring.open_roles}")
+    if brief.hiring:
+        detail_lines += ["### Hiring", "", brief.hiring.summary]
+        if brief.hiring.open_roles:
+            detail_lines.append(f"**Open roles:** {brief.hiring.open_roles}")
     detail_lines.append("")
 
     if brief.funding_history:
