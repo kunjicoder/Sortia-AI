@@ -1,26 +1,21 @@
+```markdown
 # VC Scout
 
-> Cold inbound at 9:00 AM. Investor-ready brief by 9:01 AM.
-
-**[DRAFT — Karthik to edit before submission]**
-
-VC Scout is an AI scouting agent that turns a company name into a structured investor brief in under 90 seconds. It replaces 30–60 minutes of manual research (LinkedIn, Crunchbase, GitHub, HN, news) with automated, multi-source web intelligence synthesized by an LLM.
-
-Built for the **Bright Data Web Data UNLOCKED Hackathon 2026** · GTM Intelligence track.
+VC Scout is an AI-powered research agent that converts a company name into a structured investor brief in under 90 seconds. It automates multi-source web intelligence — LinkedIn, Crunchbase, GitHub, Hacker News, press mentions — and synthesizes the findings using a large language model.
 
 ---
 
-## The Problem
+## Problem Statement
 
-Early-stage VC associates see 200+ inbound companies per month. Triaging each one manually — founder backgrounds, traction signals, recent press, funding history — takes 30–60 minutes per company. That's hours burned on triage instead of investment thesis work.
+Early-stage venture capital associates typically review 200+ inbound companies per month. Manually researching each one — including founder backgrounds, traction signals, recent press, and funding history — requires 30–60 minutes per company. This manual triage process consumes hours that could otherwise be dedicated to investment thesis development.
 
-VC Scout compresses that to under two minutes.
+VC Scout reduces this triage time to less than two minutes.
 
 ---
 
 ## Architecture
 
-```
+```text
 Company name (input)
         │
         ▼
@@ -43,38 +38,25 @@ Company name (input)
   rendered in Gradio   app.py
 ```
 
-### Bright Data integration
+### Bright Data Integration
 
 **Product used: SERP API**
 
-`sources/serp.py` calls the Bright Data SERP API to run a targeted Google search for each company:
+The `sources/serp.py` module calls the Bright Data SERP API to perform a targeted web search for each company using the query:
 
-```
-"{company}" (news OR raised OR launched OR hiring)
-```
+`"{company}" (news OR raised OR launched OR hiring)`
 
-The request uses `brd_json=1` so Bright Data returns parsed JSON (organic results, news snippets) instead of raw HTML. The response is normalised into a flat list of `{title, url, description, source}` dicts and passed verbatim to the LLM as evidence.
+The request uses `brd_json=1` to return parsed JSON (organic results, news snippets) instead of raw HTML. The response is normalized into a flat list of `{title, url, description, source}` dictionaries and passed to the LLM as evidence. This enables VC Scout to retrieve live, post‑training‑cutoff data directly from the web.
 
-This is what lets VC Scout surface **post-training-cutoff data** — see the demo story below.
+### LLM Synthesis
 
-### LLM synthesis — AI/ML API
-
-`llm.py` calls the AI/ML API (partner prize, OpenAI-compatible endpoint) with a structured prompt asking the model to produce a JSON object matching the `Brief` Pydantic schema. The schema covers: founders, traction signals, hiring, funding history, recent press, competitive positioning, red flags, and a recommendation (`take_call` / `dig_deeper` / `pass`).
+The `llm.py` module calls an OpenAI‑compatible endpoint with a structured prompt, asking the model to produce a JSON object matching the `Brief` Pydantic schema. The schema includes: founders, traction signals, hiring activity, funding history, recent press, competitive positioning, red flags, and a recommendation (`take_call` / `dig_deeper` / `pass`).
 
 The system prompt instructs the model to:
-- Populate `sources[]` with every URL it used from the evidence
-- Tie major claims to a source URL
-- Only raise a `red_flags` entry when there is concrete evidence (prevents speculative `founder_turnover` on companies that simply have a thin public footprint)
 
----
-
-## Demo Story
-
-**The signal that proves live web data, not model memory:**
-
-Wispr Flow raised a **$30M Series A from Menlo Ventures** in June 2025. That is after every major model's training cutoff. When you run VC Scout on "Wispr Flow", it correctly surfaces that round — because the data came from the live web via Bright Data, not from the model's weights.
-
-Compare: searching for "GodHands" (a fictional company) returns an empty SERP and the brief reflects that honestly, with a `missing_footprint` red flag instead of fabricated data.
+- Populate `sources[]` with every URL used from the evidence.
+- Attribute major claims to a specific source URL.
+- Raise a `red_flags` entry only when concrete evidence exists (avoiding speculative flags for companies with a limited public footprint).
 
 ---
 
@@ -84,9 +66,9 @@ Compare: searching for "GodHands" (a fictional company) returns an empty SERP an
 
 - Python 3.11+
 - A [Bright Data](https://brightdata.com) account with the SERP API zone enabled
-- An [AI/ML API](https://aimlapi.com) key (or a Grok/xAI key)
+- An LLM API key (e.g., AI/ML API, Grok/xAI, or standard OpenAI)
 
-### Install
+### Installation
 
 ```bash
 git clone <repo-url>
@@ -96,46 +78,46 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Configure `.env`
+### Environment Configuration
 
-Copy `.env.example` to `.env` and fill in:
+Copy `.env.example` to `.env` and populate with your credentials:
 
 ```env
-# LLM — choose one provider
-LLM_PROVIDER=aiml          # or "grok"
-AIML_API_KEY=...
+# LLM — choose your provider
+LLM_PROVIDER=aiml          # or "grok", "openai"
+AIML_API_KEY=your_api_key_here
 AIML_MODEL=gpt-4o-mini
 
 # Bright Data
-BRIGHTDATA_API_KEY=...
-BRIGHTDATA_SERP_ZONE=...   # zone name from the Bright Data dashboard
+BRIGHTDATA_API_KEY=your_api_key_here
+BRIGHTDATA_SERP_ZONE=your_zone_name   # zone name from Bright Data dashboard
 
-# Demo safety net — returns cached briefs instantly for known companies
+# Demo/Testing Mode — returns cached briefs instantly for known companies to save API calls
 USE_DEMO_CACHE=false
 ```
 
-### Run
+### Execution
 
-**Gradio web UI (recommended for demos):**
+**Gradio Web UI (Recommended):**
 
 ```bash
 python -m vc_scout.app
-# → opens http://127.0.0.1:7860
+# Opens http://127.0.0.1:7860
 ```
 
-**CLI (raw JSON output):**
+**CLI (Raw JSON output):**
 
 ```bash
-python -m vc_scout.orchestrator "Wispr Flow"
+python -m vc_scout.orchestrator "Company Name"
 ```
 
-**With demo cache (no network calls):**
+**With Cache (No network calls):**
 
 ```bash
-USE_DEMO_CACHE=true python -m vc_scout.orchestrator "Wispr Flow"
+USE_DEMO_CACHE=true python -m vc_scout.orchestrator "Company Name"
 ```
 
-### Tests
+### Testing
 
 ```bash
 pytest -q
@@ -145,18 +127,18 @@ pytest -q
 
 ## Project Structure
 
-```
+```text
 vc_scout/
   app.py           Gradio UI
   orchestrator.py  Main agent loop (build_brief)
-  llm.py           LLM client (AI/ML API / Grok, OpenAI SDK)
-  models.py        Pydantic schemas (Brief, Founder, TractionSignals, …)
+  llm.py           LLM client
+  models.py        Pydantic schemas (Brief, Founder, TractionSignals, ...)
   config.py        Settings loaded from .env
-  demo_cache/      Pre-generated briefs for offline/demo mode
+  demo_cache/      Pre-generated briefs for offline/testing mode
   sources/
     serp.py        Bright Data SERP API wrapper
-    linkedin.py    (stub — cut from v1 demo path)
-    unlocker.py    (stub — planned v2)
+    linkedin.py    (stub)
+    unlocker.py    (stub)
 tests/
   test_smoke.py    Import and schema round-trip smoke tests
   test_serp.py     Unit tests for SERP response parser
@@ -164,14 +146,8 @@ tests/
 
 ---
 
-## Hackathon Notes
+## Notes
 
-- **Track:** GTM Intelligence
-- **Builder:** Karthik Narayan Sudheer (solo)
-- **Deadline:** May 30, 2026
-- Bright Data products demonstrated: **SERP API** (live; Web Scraper and Web Unlocker stubs ready for v2)
-- AI/ML API used as the primary LLM gateway (partner prize integration)
-
----
-
-*Built without LangChain, CrewAI, or any agent framework — direct SDK calls only.*
+- Built with direct SDK calls for speed and simplicity — no heavy agent frameworks.
+- For questions or contributions, please refer to the repository issues page.
+```
