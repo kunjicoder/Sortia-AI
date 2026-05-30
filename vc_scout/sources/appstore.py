@@ -1,201 +1,162 @@
-"""App Store collector — iOS rating, review velocity, ranking.
+"""App Store collector — iOS rating and review signals via iTunes Search API.
 
-Adaptive: only runs when company_type=consumer_app (or appstore_url present).
-Uses Bright Data Scraping Browser (CDP/Playwright) to render the App Store
-listing and extract structured signals.
+Adaptive: applies_to() returns True when company_type=consumer_app.
+Uses the public iTunes Search API (no key required).
+Searches by company name, not URL — works even when SERP misses the App Store link.
 
-Signals emitted:
-  section="traction" — rating, review count, chart ranking (trust="high": Apple's own data)
-  section="product"  — app subtitle, description excerpt (trust="medium": store copy)
+API endpoint:
+  GET https://itunes.apple.com/search?term=<name>&entity=software&limit=5
+  Returns: trackName, averageUserRating, userRatingCount, price, sellerName,
+           trackViewUrl, shortDescription / description
 
-Degrades to [] if BRIGHTDATA_BROWSER_URL is unset or the page doesn't render.
+Signals emitted (section="traction", trust="high" — Apple's own data):
+  - Rating + review count (independent adoption proxy)
+  - Price (freemium/paid signal)
+
+Degrades to [] if API returns no results or request fails.
 """
 
 from __future__ import annotations
 
 import logging
-import re
+from typing import Any
+from urllib.parse import quote_plus
+
+import requests
 
 log = logging.getLogger(__name__)
 
-# Patterns for metric extraction from rendered App Store text
-_RATING_RE = re.compile(r"\b([1-5]\.\d)\b(?:\s*out\s+of\s+5)?")
-_REVIEW_COUNT_RE = re.compile(r"([\d,.]+[KkMm]?)\s+(?:Ratings?|Reviews?)")
-_RANK_RE = re.compile(r"#\s*(\d+)\s+in\s+([\w\s&]+?)(?:\n|$)")
+_API_BASE = "https://itunes.apple.com/search"
+_TIMEOUT = 15
 
 
-def fetch_appstore_signals(appstore_url: str) -> dict:
-    """Return structured App Store signals, or {} on any failure.
+def fetch_app_signals(app_name: str) -> dict[str, Any]:
+    """Return App Store signals for app_name, or {} on any failure.
 
-    Output:
-      {
-        "rating":        float,    # e.g. 4.8
-        "review_count":  str,      # e.g. "31.4K"
-        "chart_rank":    str,      # e.g. "#1 in Productivity"
-        "description":   str,      # first 500 chars of app description
-        "app_subtitle":  str,      # marketing tagline below the title
-        "source_url":    str,
-      }
+    Searches iTunes for up to 5 results and picks the best match
+    (highest userRatingCount among results where trackName partially matches).
+
+    Output keys (only present fields included):
+      track_name, rating, review_count, price, seller_name, source_url
     """
-    if not appstore_url:
-        return {}
-
-    from ..config import settings
-    if not settings.brightdata_browser_url:
-        log.warning("AppStore: Scraping Browser not configured — skipping.")
+    if not app_name:
         return {}
 
     try:
-        page_text, structured = _render_appstore(appstore_url, settings.brightdata_browser_url)
-    except ImportError as exc:
-        log.error("AppStore: Playwright not installed (%s).", exc)
-        return {}
+        resp = requests.get(
+            _API_BASE,
+            params={"term": app_name, "entity": "software", "limit": 5},
+            timeout=_TIMEOUT,
+            headers={"User-Agent": "vc-scout/1.0"},
+        )
+        if not resp.ok:
+            log.warning("iTunes API returned %d for '%s'", resp.status_code, app_name)
+            return {}
+
+        results = resp.json().get("results", [])
+        if not results:
+            log.info("iTunes: no results for '%s'", app_name)
+            return {}
+
+        # Pick best match: prefer name overlap, tie-break by review count
+        query_lower = app_name.lower()
+        best = max(
+            results,
+            key=lambda r: (
+                _name_overlap(r.get("trackName", ""), query_lower),
+                r.get("userRatingCount", 0),
+            ),
+        )
+
+        out: dict[str, Any] = {}
+        if best.get("trackName"):
+            out["track_name"] = best["trackName"]
+        if best.get("averageUserRating") is not None:
+            out["rating"] = round(float(best["averageUserRating"]), 1)
+        if best.get("userRatingCount") is not None:
+            out["review_count"] = int(best["userRatingCount"])
+        if best.get("price") is not None:
+            out["price"] = float(best["price"])
+        if best.get("sellerName"):
+            out["seller_name"] = best["sellerName"]
+        if best.get("trackViewUrl"):
+            out["source_url"] = best["trackViewUrl"]
+
+        if not out:
+            return {}
+
+        log.info(
+            "iTunes: '%s' → %s (rating=%.1f, reviews=%s)",
+            app_name,
+            out.get("track_name"),
+            out.get("rating", 0.0),
+            out.get("review_count", 0),
+        )
+        return out
+
     except Exception as exc:
-        log.error("AppStore FAILED for %s — %s: %s", appstore_url, type(exc).__name__, exc, exc_info=True)
+        log.error("iTunes fetch FAILED for '%s' — %s: %s", app_name, type(exc).__name__, exc)
         return {}
 
-    if not page_text:
-        return {}
 
-    out: dict = {"source_url": appstore_url}
-
-    # Description from structured JS extraction, or regex fallback
-    if structured.get("description"):
-        out["description"] = structured["description"][:500]
-    if structured.get("subtitle"):
-        out["app_subtitle"] = structured["subtitle"][:120]
-
-    # Rating
-    rating_m = _RATING_RE.search(page_text)
-    if rating_m:
-        try:
-            out["rating"] = float(rating_m.group(1))
-        except ValueError:
-            pass
-
-    # Review count
-    rc_m = _REVIEW_COUNT_RE.search(page_text)
-    if rc_m:
-        out["review_count"] = rc_m.group(1)
-
-    # Chart ranking — take the first match (highest rank)
-    rank_m = _RANK_RE.search(page_text)
-    if rank_m:
-        out["chart_rank"] = f"#{rank_m.group(1)} in {rank_m.group(2).strip()}"
-
-    if len(out) <= 1:  # only source_url — nothing extracted
-        log.info("AppStore: no structured signals extracted from %s", appstore_url)
-        return {}
-
-    log.info("AppStore: extracted %s", {k: v for k, v in out.items() if k != "description"})
-    return out
-
-
-def _render_appstore(url: str, browser_ws_url: str) -> tuple[str, dict]:
-    """Render the App Store listing via Scraping Browser.
-
-    Returns (page_text, structured_dict) where structured_dict has
-    'description' and 'subtitle' extracted by JS if possible.
-    """
-    from playwright.sync_api import sync_playwright
-
-    structured: dict = {}
-
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(browser_ws_url)
-        try:
-            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
-            page = ctx.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=30_000)
-            page.wait_for_timeout(2_000)
-
-            # Try to extract key fields via JS
-            structured = page.evaluate("""() => {
-                function text(sel) {
-                    const el = document.querySelector(sel);
-                    return el ? el.innerText.trim() : '';
-                }
-                return {
-                    subtitle: text('.product-header__subtitle') ||
-                              text('[class*="subtitle"]') || '',
-                    description: text('.section__description .we-truncate') ||
-                                 text('.we-clamp') ||
-                                 text('[class*="description"] p') || '',
-                };
-            }""") or {}
-
-            # Full page text for regex-based extraction
-            page_text = page.evaluate("""() => document.body ? document.body.innerText : ''""") or ""
-            page.close()
-        finally:
-            browser.close()
-
-    return page_text, structured
+def _name_overlap(track_name: str, query_lower: str) -> int:
+    """Score how well track_name matches query. Simple word-overlap count."""
+    track_lower = track_name.lower()
+    if query_lower in track_lower or track_lower in query_lower:
+        return 2
+    query_words = set(query_lower.split())
+    track_words = set(track_lower.split())
+    return len(query_words & track_words)
 
 
 # ── Collector wrapper ────────────────────────────────────────────────────────
 
 class AppStoreCollector:
-    """Collector: iOS App Store signals (rating, reviews, ranking).
+    """Collector: iOS App Store signals (rating, review count, price).
 
-    Adaptive: applies_to() returns True for consumer_app type OR when
-    appstore_url is present (resolver found it in SERP).
+    Adaptive: applies_to() requires company_type=consumer_app.
+    Searches by company name via iTunes API — no App Store URL needed.
+    Signals are trust="high" — Apple's own platform data.
     """
     name = "App Store"
 
     def applies_to(self, ctx) -> bool:
-        return bool(ctx.appstore_url)
+        return ctx.company_type == "consumer_app"
 
     def collect(self, ctx) -> list:
         from .base import Signal
 
-        data = fetch_appstore_signals(ctx.appstore_url)
+        data = fetch_app_signals(ctx.company)
         if not data:
             return []
 
-        url = data.get("source_url", ctx.appstore_url)
+        url = data.get("source_url", "https://apps.apple.com")
         signals: list[Signal] = []
 
-        # Traction signals — high trust (Apple's own platform data)
-        if "rating" in data and "review_count" in data:
+        # Primary traction signal — rating + review count
+        parts: list[str] = []
+        if "rating" in data:
+            parts.append(f"{data['rating']}★")
+        if "review_count" in data:
+            count = data["review_count"]
+            if count >= 1_000:
+                parts.append(f"{count / 1000:.1f}K ratings")
+            else:
+                parts.append(f"{count:,} ratings")
+        if "price" in data:
+            price = data["price"]
+            parts.append("free" if price == 0.0 else f"${price:.2f}")
+        if "track_name" in data:
+            parts.append(f"app: {data['track_name']}")
+
+        if parts:
             signals.append(Signal(
                 section="traction",
-                fact=f"iOS App Store rating: {data['rating']}/5.0 from {data['review_count']} ratings.",
+                fact=f"App Store: {', '.join(parts)} (independent adoption proxy).",
                 url=url, source="App Store", trust="high",
-                key="ios_rating", value={"rating": data["rating"], "count": data["review_count"]},
-            ))
-        elif "rating" in data:
-            signals.append(Signal(
-                section="traction",
-                fact=f"iOS App Store rating: {data['rating']}/5.0.",
-                url=url, source="App Store", trust="high",
-                key="ios_rating", value=data["rating"],
+                key="ios_rating",
+                value={k: v for k, v in data.items() if k != "source_url"},
             ))
 
-        if "chart_rank" in data:
-            signals.append(Signal(
-                section="traction",
-                fact=f"App Store chart position: {data['chart_rank']}.",
-                url=url, source="App Store", trust="high",
-                key="chart_rank",
-            ))
-
-        # Product signals — medium trust (store copy, first-party)
-        if "app_subtitle" in data:
-            signals.append(Signal(
-                section="product",
-                fact=f"App Store subtitle: {data['app_subtitle']}",
-                url=url, source="App Store", trust="medium",
-                key="app_subtitle",
-            ))
-
-        if "description" in data:
-            signals.append(Signal(
-                section="product",
-                fact=data["description"][:400],
-                url=url, source="App Store", trust="medium",
-                key="app_description",
-            ))
-
-        log.info("App Store: emitted %d signals from %s", len(signals), url)
+        log.info("App Store collector: emitted %d signals from %s", len(signals), url)
         return signals

@@ -189,15 +189,71 @@ hiring_gtm: ATS role mix + GTM motion signal. If no ATS data, say so and set con
    ✗ "What is your go-to-market strategy?" (generic)
    ✓ "The 10× ARR growth is self-reported — what is the base ARR and how measured?" (specific)
 
-5. research_log: one entry per source that contributed data. State what was examined, found,
-   and the investor-relevant inference. Be concrete.
-6. data_completeness: set booleans based on which bundle sections are non-empty.
+5. research_log: Leave as [] — filled programmatically after synthesis; do not populate.
+6. data_completeness: Leave as null — filled programmatically after synthesis; do not populate.
 
 ━━━ OUTPUT RULES ━━━
 - sources[]: every URL you actually used — must not be empty.
 - decision_drivers: exactly 4 entries.
 - Each MemoSection.confidence: "High" | "Medium" | "Low".
 - Do NOT fabricate. Unknown fields → null or omit."""
+
+
+def _found_summary(signals: list[Signal]) -> str:
+    if not signals:
+        return "No data returned"
+    facts = [s.fact[:120] for s in signals[:3]]
+    return "; ".join(facts)
+
+
+def _inference_summary(source: str, signals: list[Signal]) -> str:
+    _map = {
+        "SERP API":          "Company footprint confirmed; context for all downstream collectors.",
+        "Scraping Browser":  "Site copy and product claims extracted (low-trust self-reported).",
+        "LinkedIn":          "Employee count and stated roles extracted (corroboration only).",
+        "ATS":               "Open roles signal team composition and GTM motion.",
+        "GitHub":            "Stars, contributors, commit cadence — independent traction proxy.",
+        "App Store":         "Rating and review count — independent adoption proxy.",
+        "LinkedIn People":   "Founder pedigree extracted from LinkedIn profiles.",
+        "G2/Capterra":       "Third-party customer reviews extracted.",
+        "Glassdoor":         "Employee sentiment extracted.",
+    }
+    if not signals:
+        return "Inconclusive — no signals returned."
+    return _map.get(source, f"{len(signals)} signal(s) collected.")
+
+
+def _make_research_steps(collector_log: list[dict], all_signals: list[Signal]) -> list[ResearchStep]:
+    sig_by_source: dict[str, list[Signal]] = {}
+    for s in all_signals:
+        sig_by_source.setdefault(s.source, []).append(s)
+
+    steps: list[ResearchStep] = []
+    for entry in collector_log:
+        source = entry.get("source", "Unknown")
+        examined = entry.get("examined", source)
+        signals = sig_by_source.get(source, [])
+        steps.append(ResearchStep(
+            source=source,
+            examined=examined,
+            found=_found_summary(signals),
+            inference=_inference_summary(source, signals),
+        ))
+    return steps
+
+
+def _make_data_completeness(all_signals: list[Signal], collector_log: list[dict]) -> DataCompleteness:
+    sources = {s.source for s in all_signals}
+    ran = {entry.get("source", "") for entry in collector_log}
+    return DataCompleteness(
+        serp="SERP API" in ran,
+        company_site="Scraping Browser" in sources,
+        linkedin="LinkedIn" in sources,
+        ats="ATS" in sources,
+        appstore="App Store" in sources,
+        github="GitHub" in sources,
+        linkedin_people="LinkedIn People" in sources,
+    )
 
 
 def build_brief(scout_input: ScoutInput) -> ScoutResult:
@@ -261,6 +317,11 @@ def build_brief(scout_input: ScoutInput) -> ScoutResult:
         system=SYSTEM_PROMPT,
     )
     llm_ms = int((time.perf_counter() - t2) * 1000)
+
+    # Override research_log and data_completeness deterministically — never trust LLM for these
+    memo.research_log = _make_research_steps(collector_log, all_signals)
+    memo.data_completeness = _make_data_completeness(all_signals, collector_log)
+
     source_count = len(memo.sources)
     log.info("LLM: %d sources cited in %dms", source_count, llm_ms)
 

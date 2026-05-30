@@ -11,7 +11,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Recommendation(str, Enum):
@@ -126,7 +126,16 @@ class InvestmentMemo(BaseModel):
     )
     hidden_insight: str = Field(default="", description="One inference connecting two cited facts; no new named entity")
 
-    # Research provenance
+    # Research provenance — populated deterministically after LLM synthesis
     research_log: List[ResearchStep] = Field(default_factory=list)
     data_completeness: Optional[DataCompleteness] = None
     sources: List[str] = Field(default_factory=list)
+
+    @field_validator("research_log")
+    @classmethod
+    def _filter_unknown_sources(cls, v: list) -> list:
+        known = frozenset({
+            "SERP API", "Scraping Browser", "LinkedIn", "ATS",
+            "GitHub", "App Store", "LinkedIn People", "G2/Capterra", "Glassdoor",
+        })
+        return [step for step in v if step.source in known]

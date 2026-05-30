@@ -48,6 +48,9 @@ class Settings:
     # (Bright Data dashboard → Web Scraper API → LinkedIn person profile).
     brightdata_dataset_people: str = ""
 
+    # GitHub REST API token (optional — raises rate limit from 60 to 5000 req/h)
+    github_token: str = ""
+
     # App
     use_demo_cache: bool = False
     # DEEP=true enables heavy founder-pedigree collectors (LinkedIn People).
@@ -74,6 +77,7 @@ def load_settings() -> Settings:
         brightdata_browser_url=_env("BRIGHTDATA_BROWSER_URL"),
         brightdata_dataset_company=_env("BRIGHTDATA_DATASET_COMPANY"),
         brightdata_dataset_people=_env("BRIGHTDATA_DATASET_PEOPLE"),
+        github_token=_env("GITHUB_TOKEN"),
         use_demo_cache=_env("USE_DEMO_CACHE", "false").lower() == "true",
         deep=_env("DEEP", "false").lower() == "true",
         log_level=_env("LOG_LEVEL", "INFO"),
