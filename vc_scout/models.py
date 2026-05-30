@@ -1,7 +1,9 @@
-"""Pydantic schemas for the investor brief.
+"""Pydantic schemas for the investment memo.
 
-These are the shapes the LLM is asked to produce. Keeping them strict so the
-demo UI can render reliably without defensive checks.
+InvestmentMemo mirrors the real 1-3 page deal memo a VC analyst submits,
+ordered Market → Team → Product → Traction → ... → Verdict.
+
+Every field obeys anti-hallucination: omit/empty when no evidence.
 """
 
 from __future__ import annotations
@@ -18,36 +20,29 @@ class Recommendation(str, Enum):
     DIG_DEEPER = "dig_deeper"
 
 
+class EvidencePoint(BaseModel):
+    fact: str = Field(description="Quoted or derived fact from the source")
+    url: str
+    source: str = Field(description="SERP | Scraping Browser | LinkedIn | ATS | App Store | GitHub | ...")
+    trust: str = Field(description="high | medium | low")
+
+
 class Founder(BaseModel):
     name: str
     role: str = Field(description="e.g. 'CEO & Co-founder'")
-    background: str = Field(description="2-3 sentence summary; only what evidence supports")
+    university: Optional[str] = Field(default=None, description="Only if found in evidence; never guess")
+    prior_companies: List[str] = Field(default_factory=list, description="Named only if in evidence")
+    prior_exits_or_scaling: Optional[str] = Field(default=None, description="e.g. 'co-founded X (acq. 2021)'; null if not in evidence")
+    domain_fit: Optional[str] = Field(default=None, description="1 sentence on why their background fits this problem")
     linkedin_url: Optional[str] = None
-    notable_priors: List[str] = Field(default_factory=list, description="Companies, schools, achievements")
+    evidence: List[EvidencePoint] = Field(default_factory=list, description="Where pedigree facts came from")
 
 
-class TractionSignals(BaseModel):
-    github_stars: Optional[int] = None
-    github_url: Optional[str] = None
-    npm_pypi_downloads: Optional[str] = None
-    hn_mentions: List[str] = Field(default_factory=list, description="Recent HN front-page hits")
-    producthunt_rank: Optional[str] = None
-    twitter_followers: Optional[int] = None
-    summary: str = Field(description="One-paragraph synthesis of overall traction")
-
-
-class HiringSignals(BaseModel):
-    team_size: Optional[int] = None
-    open_roles: int = 0
-    recent_hires: List[str] = Field(default_factory=list)
-    summary: str
-
-
-class PressItem(BaseModel):
-    title: str
-    url: str
-    source: str
-    date: Optional[str] = None
+class MemoSection(BaseModel):
+    summary: str = Field(description="Analyst prose for this section, from evidence only")
+    key_points: List[str] = Field(default_factory=list)
+    evidence: List[EvidencePoint] = Field(default_factory=list)
+    confidence: str = Field(description="High | Medium | Low — based on independent source coverage")
 
 
 class FundingRound(BaseModel):
@@ -57,125 +52,81 @@ class FundingRound(BaseModel):
     investors: List[str] = Field(default_factory=list)
 
 
-class CompetitivePositioning(BaseModel):
-    market_segment: str
-    competitors: List[str] = Field(default_factory=list)
-    differentiation: str
-
-
-class RedFlag(BaseModel):
-    category: str = Field(description="e.g. 'founder_turnover', 'missing_footprint', 'unverifiable_claim'")
-    detail: str
-
-
-class Contradiction(BaseModel):
-    claim: str = Field(description="The claim the company makes on its own site")
-    claim_url: str = Field(description="URL of the company's own page making the claim")
-    web_evidence: str = Field(description="The contradicting or supporting fact from independent web sources")
-    evidence_url: str = Field(description="URL of the independent source")
-    severity: str = Field(description="high | medium | low")
-    is_contradiction: bool = Field(description="true if contradicts, false if supports/corroborates")
-
-
-class EvidencePoint(BaseModel):
-    """A single cited fact backing a score driver."""
-    fact: str = Field(description="The specific quoted fact from the source")
-    url: str
-    source_type: str = Field(description="serp | site | linkedin | ats")
-
-
 class ScoreDriver(BaseModel):
     name: str = Field(description="Asymmetry | Defensibility | Timing | Founder grit")
     score: int = Field(ge=1, le=10)
-    rationale: str = Field(description="1-2 sentences quoting the specific fact behind the score")
-    evidence_url: str = Field(default="", description="Primary URL supporting this score")
     confidence: str = Field(description="High | Medium | Low")
-    supporting_evidence: List[EvidencePoint] = Field(
-        default_factory=list,
-        description="1-3 cited facts backing the score",
-    )
+    rationale: str = Field(description="1-2 sentences quoting the specific fact behind the score")
+    supporting_evidence: List[EvidencePoint] = Field(default_factory=list)
 
 
-class Market(BaseModel):
-    """Market context — omit or null fields that have no evidence."""
-    segment: str
-    sizing_note: Optional[str] = Field(default=None, description="TAM/SAM only if a size figure appears in evidence")
-    tailwinds: List[str] = Field(default_factory=list, description="Short phrases grounded in evidence")
-    headwinds: List[str] = Field(default_factory=list, description="Short phrases grounded in evidence")
-    competitors: List[str] = Field(default_factory=list, description="Named only if they appear in a snippet")
+class Contradiction(BaseModel):
+    claim: str
+    claim_url: str
+    web_evidence: str
+    evidence_url: str
+    severity: str = Field(description="high | medium | low")
+    is_contradiction: bool
+
+
+class RedFlag(BaseModel):
+    category: str = Field(description="e.g. 'missing_footprint', 'unverifiable_claim', 'leadership_churn'")
+    detail: str
 
 
 class ResearchStep(BaseModel):
-    """One entry per source actually consulted — shows the brief's work."""
-    source: str = Field(description="SERP API | Scraping Browser | LinkedIn | ATS")
-    examined: str = Field(description="What URL or data type was looked at")
-    found: str = Field(description="What came back, or 'No data returned'")
-    inference: str = Field(description="Investor-relevant takeaway, or 'Inconclusive'")
+    source: str
+    examined: str
+    found: str
+    inference: str = Field(default="", description="Investor-relevant takeaway, or 'Inconclusive'")
 
 
 class DataCompleteness(BaseModel):
-    """Honest map of which sources contributed data."""
     serp: bool
     company_site: bool
     linkedin: bool
     ats: bool
-    notes: str = Field(default="", description="Gaps and how they limit confidence")
+    linkedin_people: bool = False
+    appstore: bool = False
+    github: bool = False
+    notes: str = Field(default="")
 
 
-class Brief(BaseModel):
+class InvestmentMemo(BaseModel):
+    """Full investment memo — mirrors the real VC analyst deal memo."""
     company_name: str
-    one_liner: str = Field(description="10-15 word analyst description of what the company does and for whom")
-    overview: str = Field(
-        default="",
-        description="2-4 sentence analyst summary: what / who for / apparent stage",
-    )
-    thesis: str = Field(description="Falsifiable investment thesis in one sentence")
+    one_liner: str = Field(description="10-15 word analyst description: what it does and for whom")
+    executive_summary: str = Field(description="3-5 sentences: opportunity, why interesting, the read")
     recommendation: Recommendation
-    conviction: str = Field(
-        default="Medium",
-        description="High | Medium | Low — confidence in the verdict itself",
-    )
-    recommendation_rationale: str = Field(
-        description="Walk from driver scores + decisive evidence to the verdict"
-    )
-    founders: List[Founder] = Field(default_factory=list)
-    market: Optional[Market] = Field(default=None, description="Market context from evidence")
-    traction: Optional[TractionSignals] = None
-    hiring: Optional[HiringSignals] = None
-    recent_press: List[PressItem] = Field(default_factory=list)
-    funding_history: List[FundingRound] = Field(default_factory=list)
-    competitive_positioning: Optional[CompetitivePositioning] = None
+    conviction: str = Field(default="Medium", description="High | Medium | Low — confidence in the verdict")
+    recommendation_rationale: str = Field(description="Walk driver scores + decisive evidence → verdict; show the reasoning")
+
+    # Memo sections in VC order (Optional so LLM can omit sections with no evidence)
+    market: Optional[MemoSection] = None
+    team: List[Founder] = Field(default_factory=list)
+    team_assessment: Optional[MemoSection] = None
+    product: Optional[MemoSection] = None
+    traction: Optional[MemoSection] = None
+    business_model: Optional[MemoSection] = None
+    competition: Optional[MemoSection] = None
+    funding: List[FundingRound] = Field(default_factory=list)
+    hiring_gtm: Optional[MemoSection] = None
+
+    # Verdict machinery
     decision_drivers: List[ScoreDriver] = Field(
         default_factory=list,
-        description="Exactly 4 scored drivers: Asymmetry, Defensibility, Timing, Founder grit",
+        description="Exactly 4: Asymmetry | Defensibility | Timing | Founder grit",
     )
-    contradictions: List[Contradiction] = Field(
-        default_factory=list,
-        description="Claims from the company site cross-checked against independent web evidence",
-    )
-    failure_paths: List[str] = Field(
-        default_factory=list,
-        description="3 company-specific failure paths",
-    )
+    contradictions: List[Contradiction] = Field(default_factory=list)
+    risks_red_flags: List[RedFlag] = Field(default_factory=list)
+    failure_paths: List[str] = Field(default_factory=list)
     diligence_questions: List[str] = Field(
         default_factory=list,
-        description="3-5 sharp questions for the founder targeting gaps/risks/unverified claims",
+        description="3-5 sharp questions targeting gaps not publicly sourceable",
     )
-    hidden_insight: Optional[str] = Field(
-        default=None,
-        description="Inference connecting two cited facts; introduces no new named entity",
-    )
-    next_action: Optional[str] = Field(
-        default=None,
-        description="The one thing a human must do that the system can't",
-    )
-    research_log: List[ResearchStep] = Field(
-        default_factory=list,
-        description="One step per source actually used — shows the research trail",
-    )
-    data_completeness: Optional[DataCompleteness] = Field(
-        default=None,
-        description="Which sources returned data and known gaps",
-    )
-    red_flags: List[RedFlag] = Field(default_factory=list)
-    sources: List[str] = Field(default_factory=list, description="URLs referenced during synthesis")
+    hidden_insight: str = Field(default="", description="One inference connecting two cited facts; no new named entity")
+
+    # Research provenance
+    research_log: List[ResearchStep] = Field(default_factory=list)
+    data_completeness: Optional[DataCompleteness] = None
+    sources: List[str] = Field(default_factory=list)

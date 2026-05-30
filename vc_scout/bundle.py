@@ -1,27 +1,25 @@
-"""EVIDENCE_BUNDLE assembly.
+"""EVIDENCE_BUNDLE assembly — Signal-aware version.
 
-Takes raw inputs (company name, SERP results, Scraping Browser site text) and
-produces the structured dict that the triangulation LLM prompt operates on.
+Takes a list of Signal objects (emitted by collectors) plus raw EntityContext
+and produces the structured dict the triangulation LLM prompt reasons over.
 
-Bundle schema (all fields optional except entity.name):
+Bundle schema:
 {
-  "entity": { "name", "one_liner", "sector", "stage", "domain" },
-  "founder_claims": [{ "claim", "source": "company_site", "url" }],
-  "web_evidence":   [{ "fact", "source_title", "url", "date" }],
-  "derived_signals": {
-      "funding":  { "total_raised", "last_round", "investors", "url" },
-      "hiring":   { "open_roles", "functions", "enterprise_signals", "url" },
-      "traction": { "notes", "url" }
-  }
+  "entity":          { name, domain, company_type },
+  "sections": {
+    "market":        [ { fact, url, source, trust, date? } ],
+    "team":          [ ... ],
+    "product":       [ ... ],
+    "traction":      [ ... ],
+    "funding":       [ ... ],
+    "competition":   [ ... ],
+    "hiring":        [ ... ],
+    "business_model": [ ... ],
+    "risks":         [ ... ],
+  },
+  "founder_claims":  [ { claim, source, url } ],   # extracted from site_text
+  "research_log":    [ { source, examined, found } ]  # per-collector summary
 }
-
-Design rules:
-- OMIT fields we can't support from evidence. Never invent numbers.
-- founder_claims come from the company's own site (Scraping Browser) — tagged
-  as unverified until the triangulation LLM cross-checks them.
-- web_evidence is everything from SERP — third-party, more trustworthy per item.
-- derived_signals are extracted heuristically from SERP snippets; only populated
-  when there's a clear signal.
 """
 
 from __future__ import annotations
@@ -32,18 +30,18 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
+from .sources.base import EntityContext, Signal
+
 log = logging.getLogger(__name__)
 
-# ── Patterns that indicate a SERP snippet is from a junk page ───────────────
-# These snippets must not be used as the entity one_liner or web_evidence facts.
+# ── Patterns (kept for SerpCollector + backward-compat helpers) ─────────────
+
 _JUNK_SNIPPET_RE = re.compile(
     r"(we[''']re hiring|join our team|exciting to work|open roles|job opening"
     r"|cookie\s+policy|privacy\s+policy|all rights reserved|sign up|log in"
     r"|subscribe to|newsletter)",
     re.IGNORECASE,
 )
-
-# ── Keyword heuristics for derived_signals ──────────────────────────────────
 
 _FUNDING_RE = re.compile(
     r"(raised?|closes?|secures?|announces?|seed|series\s+[a-d]|pre-seed"
@@ -64,74 +62,91 @@ _TRACTION_RE = re.compile(
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
-def assemble(
-    company: str,
-    serp_results: list[dict[str, Any]],
-    site_text: str,
-    site_url: str = "",
-    linkedin_signals: dict[str, Any] | None = None,
-    ats_signals: dict[str, Any] | None = None,
+def assemble_from_signals(
+    ctx: EntityContext,
+    signals: list[Signal],
+    collector_log: list[dict],
 ) -> dict[str, Any]:
-    """Return the EVIDENCE_BUNDLE dict for the triangulation prompt."""
-    entity = _build_entity(company, serp_results, site_url)
-    web_evidence = _build_web_evidence(serp_results)
-    founder_claims = _extract_founder_claims(site_text, site_url or entity.get("domain", ""))
-    derived = _build_derived_signals(serp_results)
+    """Build the memo-structured EVIDENCE_BUNDLE from collected Signals."""
+    # Group signals by section
+    sections: dict[str, list[dict]] = {}
+    for sig in signals:
+        if sig.key == "site_text":
+            continue  # handled separately as founder_claims
+        entry: dict[str, Any] = {
+            "fact": sig.fact,
+            "url": sig.url,
+            "source": sig.source,
+            "trust": sig.trust,
+        }
+        if sig.date:
+            entry["date"] = sig.date
+        sections.setdefault(sig.section, []).append(entry)
+
+    # Extract founder claims from site_text signal if present
+    site_signal = next((s for s in signals if s.key == "site_text"), None)
+    founder_claims = []
+    if site_signal and site_signal.value:
+        founder_claims = _extract_founder_claims(site_signal.value, site_signal.url)
 
     bundle: dict[str, Any] = {
-        "entity": entity,
-        "web_evidence": web_evidence,
+        "entity": {
+            "name": ctx.company,
+            "domain": ctx.domain,
+            "company_type": ctx.company_type,
+        },
+        "sections": sections,
+        "research_log": collector_log,
     }
     if founder_claims:
         bundle["founder_claims"] = founder_claims
-    if derived:
-        bundle["derived_signals"] = derived
-    if linkedin_signals:
-        # Independent third-party structured data from LinkedIn — a source no LLM
-        # tool can reach. Corroborating signal, NOT ground truth (see prompt caveat).
-        bundle["linkedin_signals"] = linkedin_signals
-    if ats_signals:
-        # Role-level hiring intent from the company's own ATS (Ashby/Greenhouse/
-        # Lever) — leading GTM signal, the company's live pipeline.
-        bundle["hiring_signals"] = ats_signals
 
+    total_signals = sum(len(v) for v in sections.values())
     log.info(
-        "Bundle assembled: %d web_evidence, %d founder_claims, derived=%s, linkedin=%s",
-        len(web_evidence),
-        len(founder_claims),
-        list(derived.keys()),
-        bool(linkedin_signals),
+        "Bundle: %d signals across %d sections, %d founder_claims",
+        total_signals, len(sections), len(founder_claims),
     )
     return bundle
 
 
-def find_linkedin_company_url(serp_results: list[dict[str, Any]]) -> str:
-    """Return the first linkedin.com/company/... URL found in SERP results, else ''."""
-    for item in serp_results:
-        url = item.get("url", "")
-        if "linkedin.com/company/" in url.lower():
-            return url.split("?")[0]
-    return ""
+def build_collector_log(
+    collector_name: str,
+    ctx: EntityContext,
+    signals: list[Signal],
+) -> dict[str, Any]:
+    """Build a research_log entry from a collector's run."""
+    if not signals:
+        return {"source": collector_name, "examined": _examined(collector_name, ctx), "found": "No data returned"}
+    facts_preview = "; ".join(s.fact[:60] for s in signals[:3])
+    return {
+        "source": collector_name,
+        "examined": _examined(collector_name, ctx),
+        "found": f"{len(signals)} signals: {facts_preview}{'…' if len(signals) > 3 else ''}",
+    }
 
 
-_ATS_URL_RE = re.compile(r"(ashbyhq\.com|greenhouse\.io|lever\.co|jobs\.[a-z0-9-]+\.|/careers)", re.I)
+def _examined(name: str, ctx: EntityContext) -> str:
+    if name == "SERP API":
+        return f"Web search for '{ctx.company}' ({len(ctx.serp_results)} results)"
+    if name == "Scraping Browser":
+        return f"https://{ctx.domain} + subpages" if ctx.domain else "company site"
+    if name == "LinkedIn":
+        return ctx.linkedin_company_url or "LinkedIn company page"
+    if name == "ATS":
+        return ctx.careers_url or "careers page"
+    if name == "App Store":
+        return ctx.appstore_url or "App Store listing"
+    if name == "GitHub":
+        return ctx.github_url or "GitHub repo"
+    if name == "LinkedIn People":
+        urls = ctx.linkedin_people_urls
+        return f"{len(urls)} founder profile(s)" if urls else "LinkedIn people"
+    return name
 
 
-def find_careers_url(serp_results: list[dict[str, Any]]) -> str:
-    """Return the first ATS/careers URL found in SERP results, else ''."""
-    for item in serp_results:
-        url = item.get("url", "")
-        if url and _ATS_URL_RE.search(url):
-            return url.split("?")[0]
-    return ""
-
+# ── Backward-compat helpers (used by legacy code paths in tests) ─────────────
 
 def find_homepage(company: str, serp_results: list[dict[str, Any]]) -> str:
-    """Guess the company's homepage from SERP results.
-
-    Prefers results whose URL matches the slugified company name over generic
-    directories (crunchbase, linkedin, techcrunch, etc.).
-    """
     slug = re.sub(r"[^a-z0-9]", "", company.lower())
     directory_domains = {
         "crunchbase.com", "linkedin.com", "techcrunch.com", "forbes.com",
@@ -139,7 +154,6 @@ def find_homepage(company: str, serp_results: list[dict[str, Any]]) -> str:
         "twitter.com", "x.com", "facebook.com", "instagram.com",
         "github.com", "wikipedia.org", "glassdoor.com", "pitchbook.com",
     }
-
     best: str = ""
     for item in serp_results:
         url = item.get("url", "")
@@ -153,68 +167,33 @@ def find_homepage(company: str, serp_results: list[dict[str, Any]]) -> str:
             return f"https://{netloc}"
         if not best:
             best = f"https://{parsed.netloc}"
-
     return best
 
 
-# ── Private helpers ──────────────────────────────────────────────────────────
-
-def _build_entity(
-    company: str,
-    serp_results: list[dict[str, Any]],
-    site_url: str,
-) -> dict[str, Any]:
-    entity: dict[str, Any] = {"name": company}
-
-    # Intentionally do NOT put a one_liner in the entity — the LLM must
-    # synthesise it from web_evidence so it reads like an analyst description,
-    # not a copied careers-page quote.  (The SYSTEM_PROMPT enforces this rule.)
-
-    domain = ""
-    if site_url:
-        parsed = urlparse(site_url)
-        domain = parsed.netloc.removeprefix("www.")
-    elif serp_results:
-        domain_candidate = find_homepage(company, serp_results)
-        if domain_candidate:
-            domain = urlparse(domain_candidate).netloc.removeprefix("www.")
-    if domain:
-        entity["domain"] = domain
-
-    return entity
-
-
-def _build_web_evidence(serp_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    evidence = []
+def find_linkedin_company_url(serp_results: list[dict[str, Any]]) -> str:
     for item in serp_results:
-        fact = (item.get("description") or item.get("title") or "").strip()
-        if not fact:
-            continue
-        # Drop snippets that are clearly from careers/boilerplate pages
-        if _JUNK_SNIPPET_RE.search(fact):
-            log.debug("Skipping junk snippet: %.80s", fact)
-            continue
         url = item.get("url", "")
-        entry: dict[str, Any] = {
-            "fact": fact[:300],
-            "source_title": (item.get("title") or "").strip()[:120],
-            "url": url,
-            "source_domain": urlparse(url).netloc.removeprefix("www.") if url else "",
-        }
-        if item.get("date"):
-            entry["date"] = item["date"]
-        evidence.append(entry)
-    return evidence
+        if "linkedin.com/company/" in url.lower():
+            return url.split("?")[0]
+    return ""
 
+
+_ATS_URL_RE = re.compile(r"(ashbyhq\.com|greenhouse\.io|lever\.co|jobs\.[a-z0-9-]+\.|/careers)", re.I)
+
+
+def find_careers_url(serp_results: list[dict[str, Any]]) -> str:
+    for item in serp_results:
+        url = item.get("url", "")
+        if url and _ATS_URL_RE.search(url):
+            return url.split("?")[0]
+    return ""
+
+
+# ── Private helpers ───────────────────────────────────────────────────────────
 
 def _extract_founder_claims(site_text: str, site_url: str) -> list[dict[str, Any]]:
-    """Extract claim sentences from site text using a cheap LLM call.
-
-    Returns [] if site_text is empty (Scraping Browser unavailable).
-    """
     if not site_text or len(site_text) < 50:
         return []
-
     try:
         return _llm_extract_claims(site_text, site_url)
     except Exception as exc:
@@ -224,7 +203,6 @@ def _extract_founder_claims(site_text: str, site_url: str) -> list[dict[str, Any
 
 def _llm_extract_claims(site_text: str, site_url: str) -> list[dict[str, Any]]:
     from .llm import complete
-
     prompt = (
         "You are extracting verifiable factual claims from a company's own website.\n\n"
         "Extract up to 8 specific, verifiable claims the company makes about itself. "
@@ -236,7 +214,6 @@ def _llm_extract_claims(site_text: str, site_url: str) -> list[dict[str, Any]]:
     )
     raw = complete(prompt)
     raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-
     try:
         items = json.loads(raw)
         if not isinstance(items, list):
@@ -248,50 +225,9 @@ def _llm_extract_claims(site_text: str, site_url: str) -> list[dict[str, Any]]:
                     "claim": str(item["claim"])[:200],
                     "source": "company_site",
                     "url": site_url,
+                    "trust": "low",
                 })
         return claims
     except json.JSONDecodeError:
         log.warning("Claim extraction: LLM returned non-JSON: %.200s", raw)
         return []
-
-
-def _build_derived_signals(serp_results: list[dict[str, Any]]) -> dict[str, Any]:
-    """Heuristically extract funding, hiring, and traction signals from SERP."""
-    derived: dict[str, Any] = {}
-
-    funding_items = [r for r in serp_results if _FUNDING_RE.search(_item_text(r))]
-    hiring_items = [r for r in serp_results if _HIRING_RE.search(_item_text(r))]
-    traction_items = [r for r in serp_results if _TRACTION_RE.search(_item_text(r))]
-
-    if funding_items:
-        best = funding_items[0]
-        funding: dict[str, Any] = {"url": best.get("url", "")}
-        # Try to pull dollar amount
-        amount_match = re.search(r"\$[\d,.]+\s*[mb]illion|\$[\d,.]+[mb]", _item_text(best), re.IGNORECASE)
-        if amount_match:
-            funding["total_raised"] = amount_match.group(0)
-        round_match = re.search(r"(seed|series\s+[a-e]|pre-seed|series\s+[a-e]\d*)", _item_text(best), re.IGNORECASE)
-        if round_match:
-            funding["last_round"] = round_match.group(0).title()
-        if funding.get("total_raised") or funding.get("last_round"):
-            derived["funding"] = funding
-
-    if hiring_items:
-        best = hiring_items[0]
-        derived["hiring"] = {
-            "notes": _item_text(best)[:200],
-            "url": best.get("url", ""),
-        }
-
-    if traction_items:
-        best = traction_items[0]
-        derived["traction"] = {
-            "notes": _item_text(best)[:200],
-            "url": best.get("url", ""),
-        }
-
-    return derived
-
-
-def _item_text(item: dict[str, Any]) -> str:
-    return f"{item.get('title', '')} {item.get('description', '')}".strip()

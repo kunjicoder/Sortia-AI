@@ -46,7 +46,7 @@ def bake(company: str) -> None:
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     out_path = _CACHE_DIR / f"{_slug(company)}.json"
 
-    payload = json.loads(result.brief.model_dump_json())
+    payload = json.loads(result.memo.model_dump_json())
     out_path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False),
         encoding="utf-8",

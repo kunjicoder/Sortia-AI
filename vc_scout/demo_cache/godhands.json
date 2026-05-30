@@ -1,124 +1,154 @@
 {
   "company_name": "GodHands",
-  "one_liner": "Provides deterministic infrastructure for AI agents to operate across digital workflows.",
-  "overview": "GodHands develops tools that allow AI agents to perform reliably in various applications. The company is in the early stages of its operations and focuses on creating infrastructure for automated workflows across desktop and browser environments.",
-  "thesis": "GodHands aims to establish a reliable infrastructure for AI agents that can function seamlessly across applications.",
-  "recommendation": "dig_deeper",
+  "one_liner": "Deterministic computer use layer enabling AI agents to operate across applications.",
+  "executive_summary": "GodHands develops a deterministic computer use layer aimed at enhancing the functionality of AI agents across various platforms. It positions itself in the developer tools market, focusing on frameworks for reliable execution of workflows in browser and desktop environments. The strong focus on AI integration indicates a growing need for such solutions as AI usage expands across different sectors.",
+  "recommendation": "pass",
   "conviction": "Medium",
-  "recommendation_rationale": "The company's claims about its capabilities and traction lack corroboration from independent sources, raising concerns about their veracity.",
-  "founders": [],
+  "recommendation_rationale": "While the company targets a relevant tech segment, the signals focus heavily on product descriptions without substantial traction or funding details, leaving uncertainty about market presence.",
   "market": {
-    "segment": "AI infrastructure and tools",
-    "sizing_note": null,
-    "tailwinds": [
-      "Growing demand for AI automation",
-      "Increased investment in developer tools"
+    "summary": "GodHands operates in the developer tools market, focusing on AI agent frameworks.",
+    "key_points": [
+      "Provides deterministic computer use layers for AI agents.",
+      "Enables reliable operation across browser and desktop applications.",
+      "Significant potential in AI integration workflows."
     ],
-    "headwinds": [],
-    "competitors": []
+    "evidence": [
+      {
+        "fact": "GodHands is a deterministic computer use layer that enables AI agents to reliably operate across browser and desktop apps.",
+        "url": "https://www.ycombinator.com/companies/godhands",
+        "source": "SERP",
+        "trust": "high"
+      },
+      {
+        "fact": "GodHands develops developer tools and infrastructure that provide deterministic action and computer use frameworks for AI agents.",
+        "url": "https://www.crunchbase.com/organization/godhands-private-limited",
+        "source": "SERP",
+        "trust": "high"
+      }
+    ],
+    "confidence": "High"
+  },
+  "team": [],
+  "team_assessment": null,
+  "product": {
+    "summary": "GodHands offers a layer enhancing AI agent functionality across applications.",
+    "key_points": [
+      "Focuses on deterministic actions for AI agents.",
+      "Targets both browser and desktop app ecosystems."
+    ],
+    "evidence": [
+      {
+        "fact": "GodHands provides a deterministic computer use layer that enables AI agents to reliably operate across browser and desktop applications.",
+        "url": "https://www.startuphub.ai/startups/godhands",
+        "source": "SERP",
+        "trust": "high"
+      }
+    ],
+    "confidence": "High"
   },
   "traction": {
-    "github_stars": null,
-    "github_url": null,
-    "npm_pypi_downloads": null,
-    "hn_mentions": [],
-    "producthunt_rank": null,
-    "twitter_followers": null,
-    "summary": "The company has recently announced new products for AI agents, indicating some level of market engagement."
+    "summary": "Limited independent traction signals are available, mainly self-reported.",
+    "key_points": [
+      "No substantial independent traction metrics.",
+      "Self-reported signals with limited detail."
+    ],
+    "evidence": [
+      {
+        "fact": "New Godhands For all my godhand users... They have a new pair out.",
+        "url": "https://www.facebook.com/groups/gunplatnt/posts/2839890043018566/",
+        "source": "SERP",
+        "trust": "high"
+      }
+    ],
+    "confidence": "Low"
   },
-  "hiring": null,
-  "recent_press": [],
-  "funding_history": [],
-  "competitive_positioning": null,
+  "business_model": null,
+  "competition": null,
+  "funding": [
+    {
+      "round": "unknown",
+      "amount": null,
+      "date": null,
+      "investors": []
+    }
+  ],
+  "hiring_gtm": null,
   "decision_drivers": [
     {
       "name": "Asymmetry",
       "score": 5,
-      "rationale": "The company provides a unique deterministic layer for AI agents across platforms, supporting diverse workflows. [ycombinator.com]",
-      "evidence_url": "",
       "confidence": "Medium",
-      "supporting_evidence": [
-        {
-          "fact": "GodHands is a deterministic computer use layer that enables AI agents to reliably operate across browser and desktop apps.",
-          "url": "https://www.ycombinator.com/companies/godhands",
-          "source_type": "serp"
-        },
-        {
-          "fact": "GodHands develops developer tools and infrastructure that provide deterministic action and computer use frameworks for AI agents.",
-          "url": "https://www.crunchbase.com/organization/godhands-private-limited",
-          "source_type": "serp"
-        }
-      ]
+      "rationale": "Strong product focus on deterministic layers implies potential market need for AI tools.",
+      "supporting_evidence": []
     },
     {
       "name": "Defensibility",
       "score": 4,
-      "rationale": "There are claims of tailored solutions for specialized users, but no third-party validation of the customer base exists.",
-      "evidence_url": "",
-      "confidence": "Low",
-      "supporting_evidence": [
-        {
-          "fact": "The company has solutions tailored for scientists, students, and research teams.",
-          "url": "https://www.startuphub.ai",
-          "source_type": "site"
-        }
-      ]
+      "confidence": "Medium",
+      "rationale": "Developing infrastructure for AI agents presents difficulty for new entrants but lacks strong competitive edge.",
+      "supporting_evidence": []
     },
     {
       "name": "Timing",
-      "score": 6,
-      "rationale": "The company's focus aligns with current trends in AI application and automation.",
-      "evidence_url": "",
+      "score": 5,
       "confidence": "Medium",
-      "supporting_evidence": [
-        {
-          "fact": "GodHands provides a deterministic computer use layer that enables AI agents to reliably operate across browser and desktop applications.",
-          "url": "https://www.startuphub.ai/startups/godhands",
-          "source_type": "serp"
-        }
-      ]
+      "rationale": "Growing adoption of AI tools supports relevance but clear market traction is missing.",
+      "supporting_evidence": []
     },
     {
       "name": "Founder grit",
       "score": 3,
-      "rationale": "No information is available on the founders' backgrounds or previous efforts.",
-      "evidence_url": "",
       "confidence": "Low",
+      "rationale": "No founder background evidence provided; unclear domain expertise.",
       "supporting_evidence": []
     }
   ],
   "contradictions": [],
+  "risks_red_flags": [],
   "failure_paths": [
-    "Lack of third-party validation for user claims could undermine perceived value and traction.",
-    "The specialized solutions for target groups may not translate into substantial market demand.",
-    "A strong reliance on deterministic processes may limit adaptability in a dynamic AI landscape."
+    "The lack of substantial traction metrics raises concerns about market validation.",
+    "Limited evidence of funding suggests potential resource constraints."
   ],
   "diligence_questions": [
-    "What is your actual user base, and how do you measure user engagement with your platform?",
-    "Can you provide specific examples of use cases demonstrating the efficiency improvements of your technology?",
-    "What partnerships or integrations have you established to enhance your service offerings?"
+    "What are the current revenue figures and growth metrics if self-reported traction is accurate?",
+    "What is the competitive landscape within the developer tools market for AI agents?",
+    "Can detailed evidence of user engagement or feedback be provided?",
+    "What specific integrations or partnerships have been secured to boost product credibility?"
   ],
-  "hidden_insight": null,
-  "next_action": null,
+  "hidden_insight": "",
   "research_log": [
     {
       "source": "SERP API",
-      "examined": "Search results for GodHands",
-      "found": "Multiple sources confirming GodHands as an infrastructure provider for AI agents.",
-      "inference": "The company appears to be in the AI tools and infrastructure segment with potential growth."
+      "examined": "Web search for 'GodHands' (10 results)",
+      "found": "10 signals: GodHands is a deterministic computer use layer that enables; GodHands develops developer tools and infrastructure that pr; GodHands provides a deterministic computer use layer that en…",
+      "inference": ""
+    },
+    {
+      "source": "GitHub",
+      "examined": "GitHub repo",
+      "found": "No data returned",
+      "inference": ""
+    },
+    {
+      "source": "Scraping Browser",
+      "examined": "https://startuphub.ai + subpages",
+      "found": "1 signals: [https://startuphub.ai] StartupHub.ai — AI Ecosystem Hub",
+      "inference": ""
     }
   ],
   "data_completeness": {
     "serp": true,
-    "company_site": true,
+    "company_site": false,
     "linkedin": false,
     "ats": false,
-    "notes": "LinkedIn and ATS data is missing, limiting insights into team structure and hiring."
+    "linkedin_people": false,
+    "appstore": false,
+    "github": false,
+    "notes": ""
   },
-  "red_flags": [],
   "sources": [
     "https://www.ycombinator.com/companies/godhands",
-    "https://www.startuphub.ai/startups/godhands",
-    "https://www.crunchbase.com/organization/godhands-private-limited"
+    "https://www.crunchbase.com/organization/godhands-private-limited",
+    "https://www.startuphub.ai/startups/godhands"
   ]
 }

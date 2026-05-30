@@ -1,6 +1,17 @@
-"""Gradio frontend for the demo.
+"""Gradio frontend — verdict-first investment memo layout.
 
-Single text input -> triangulation investor memo rendered as markdown.
+Layout (top to bottom):
+  1. Header: company name · verdict badge · conviction · one_liner
+  2. Executive summary + recommendation rationale
+  3. Data completeness strip
+  4. Decision drivers (4 scored drivers with evidence)
+  5. Contradictions / red flags / failure paths
+  6. Diligence questions
+  7. Research log ("How We Got Here")
+  8. Hidden insight
+  9. Full detail (collapsible): market · team · product · traction ·
+     business_model · competition · hiring_gtm · funding
+ 10. Sources · stats footer
 
 Launch:
     python -m vc_scout.app
@@ -12,7 +23,7 @@ import logging
 
 import gradio as gr
 
-from .models import Brief, Recommendation
+from .models import InvestmentMemo, MemoSection, Recommendation
 from .orchestrator import ScoutInput, ScoutResult, build_brief
 
 log = logging.getLogger(__name__)
@@ -33,12 +44,12 @@ _SCORE_LABEL = [
 ]
 
 _SEVERITY_ICON = {"high": "🔴", "medium": "🟡", "low": "🟢"}
-_SOURCE_ICON = {"serp": "🌐", "site": "🏠", "linkedin": "💼", "ats": "📋"}
+_TRUST_ICON = {"high": "✅", "medium": "🟡", "low": "⚠️"}
 
 _PROGRESS_STEPS = [
     "Searching the web…",
     "Reading sources…",
-    "Synthesizing brief…",
+    "Synthesizing memo…",
 ]
 
 
@@ -69,21 +80,35 @@ def _score_label(score: int) -> str:
     return f"{score}/10"
 
 
+def _render_memo_section(title: str, section: MemoSection) -> list[str]:
+    conf_icon = _TRUST_ICON.get(section.confidence.lower(), "")
+    lines = [f"### {title}", "", f"{conf_icon} *{section.confidence} confidence* — {section.summary}"]
+    if section.key_points:
+        lines.append("")
+        for kp in section.key_points:
+            lines.append(f"- {kp}")
+    if section.evidence:
+        lines.append("")
+        lines.append("*Evidence:*")
+        for ep in section.evidence:
+            icon = _TRUST_ICON.get(ep.trust.lower(), "🔗")
+            lines.append(f"- {icon} [{ep.source}]({ep.url}): *{ep.fact[:120]}*")
+    lines.append("")
+    return lines
+
+
 def _render_markdown(result: ScoutResult) -> str:
-    brief = result.brief
-    color, label = _BADGE.get(
-        brief.recommendation,
-        ("#555", brief.recommendation.value.upper()),
-    )
-    conviction = brief.conviction or "Medium"
+    memo = result.memo
+    color, label = _BADGE.get(memo.recommendation, ("#555", memo.recommendation.value.upper()))
+    conviction = memo.conviction or "Medium"
     conv_color = _CONVICTION_COLOR.get(conviction, "#555")
 
     lines: list[str] = []
 
     # ── 1. Header band ───────────────────────────────────────────────────────
-    lines.append(f"# {brief.company_name}")
-    if brief.one_liner:
-        lines.append(f"*{brief.one_liner}*")
+    lines.append(f"# {memo.company_name}")
+    if memo.one_liner:
+        lines.append(f"*{memo.one_liner}*")
     lines.append("")
     lines.append(
         f'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
@@ -94,51 +119,51 @@ def _render_markdown(result: ScoutResult) -> str:
         f'</div>'
     )
     lines.append("")
-    if brief.thesis:
-        lines.append(f"**Thesis:** {brief.thesis}")
-    lines.append("")
-    lines.append(f"**Rationale:** {brief.recommendation_rationale}")
+
+    # ── 2. Executive summary ─────────────────────────────────────────────────
+    lines += ["## Executive Summary", "", memo.executive_summary, ""]
+    lines.append(f"**Rationale:** {memo.recommendation_rationale}")
     lines.append("")
     lines.append("---")
 
-    # ── 2. Overview + data completeness strip ────────────────────────────────
-    if brief.overview:
-        lines += ["", "## Overview", "", brief.overview]
-
-    if brief.data_completeness:
-        dc = brief.data_completeness
+    # ── 3. Data completeness strip ───────────────────────────────────────────
+    if memo.data_completeness:
+        dc = memo.data_completeness
         strips = []
         strips.append("🌐 SERP" if dc.serp else "~~🌐 SERP~~")
         strips.append("🏠 Site" if dc.company_site else "~~🏠 Site~~")
         strips.append("💼 LinkedIn" if dc.linkedin else "~~💼 LinkedIn~~")
         strips.append("📋 ATS" if dc.ats else "~~📋 ATS~~")
-        lines += ["", f"*Sources: {' · '.join(strips)}*"]
+        if dc.appstore:
+            strips.append("📱 App Store")
+        if dc.github:
+            strips.append("🐙 GitHub")
+        if dc.linkedin_people:
+            strips.append("👤 Founders")
+        lines += [f"*Sources: {' · '.join(strips)}*", ""]
         if dc.notes:
             lines.append(f"*{dc.notes}*")
+        lines.append("")
 
-    lines.append("")
-    lines.append("---")
-
-    # ── 3. Decision drivers ──────────────────────────────────────────────────
-    if brief.decision_drivers:
-        lines += ["", "## Decision Drivers", ""]
-        for d in brief.decision_drivers:
+    # ── 4. Decision drivers ──────────────────────────────────────────────────
+    if memo.decision_drivers:
+        lines += ["## Decision Drivers", ""]
+        for d in memo.decision_drivers:
             score_str = _score_label(d.score)
             conf = f" · *{d.confidence} confidence*" if d.confidence else ""
-            src = f" · [source]({d.evidence_url})" if d.evidence_url else ""
             lines.append(f"**{d.name}** — {score_str}{conf}")
-            lines.append(f"> {d.rationale}{src}")
-            if d.supporting_evidence:
-                for ep in d.supporting_evidence:
-                    icon = _SOURCE_ICON.get(ep.source_type, "🔗")
-                    lines.append(f"> - {icon} *{ep.fact[:120]}* — [{ep.source_type}]({ep.url})")
+            lines.append(f"> {d.rationale}")
+            for ep in d.supporting_evidence:
+                icon = _TRUST_ICON.get(ep.trust.lower(), "🔗")
+                lines.append(f"> {icon} *{ep.fact[:120]}* — [{ep.source}]({ep.url})")
             lines.append("")
 
-    # ── 4. Contradictions + failure paths ────────────────────────────────────
-    lines += ["", "## Contradictions"]
-    if brief.contradictions:
-        lines.append("")
-        for c in brief.contradictions:
+    lines.append("---")
+
+    # ── 5. Contradictions · red flags · failure paths ────────────────────────
+    if memo.contradictions:
+        lines += ["## Contradictions", ""]
+        for c in memo.contradictions:
             icon = _SEVERITY_ICON.get(c.severity.lower(), "⚠️")
             verb = "CONTRADICTS" if c.is_contradiction else "CORROBORATES"
             lines += [
@@ -147,128 +172,109 @@ def _render_markdown(result: ScoutResult) -> str:
                 f"- Evidence ([source]({c.evidence_url})): {c.web_evidence}",
                 "",
             ]
-    else:
-        lines += [
-            "",
-            "*No contradictions between company claims and web evidence — claims check out.*",
-            "",
-        ]
 
-    if brief.failure_paths:
-        lines += ["", "## Why This Could Break", ""]
-        for fp in brief.failure_paths:
+    if memo.risks_red_flags:
+        lines += ["## Red Flags", ""]
+        for rf in memo.risks_red_flags:
+            lines.append(f"- **{rf.category}** — {rf.detail}")
+        lines.append("")
+
+    if memo.failure_paths:
+        lines += ["## Why This Could Break", ""]
+        for fp in memo.failure_paths:
             lines.append(f"- {fp}")
+        lines.append("")
 
-    # ── 5. Diligence questions ───────────────────────────────────────────────
-    if brief.diligence_questions:
-        lines += ["", "## Diligence Questions", ""]
-        for i, q in enumerate(brief.diligence_questions, 1):
+    # ── 6. Diligence questions ───────────────────────────────────────────────
+    if memo.diligence_questions:
+        lines += ["## Diligence Questions", ""]
+        for i, q in enumerate(memo.diligence_questions, 1):
             lines.append(f"{i}. {q}")
+        lines.append("")
 
-    # ── 6. Research log ──────────────────────────────────────────────────────
-    if brief.research_log:
-        lines += ["", "## How We Got Here", ""]
+    lines.append("---")
+
+    # ── 7. Research log ──────────────────────────────────────────────────────
+    if memo.research_log:
+        lines += ["## How We Got Here", ""]
         lines.append("| Source | Examined | Found | Investor Inference |")
         lines.append("|--------|----------|-------|--------------------|")
-        for step in brief.research_log:
+        for step in memo.research_log:
             found = step.found.replace("|", "·")[:80]
             inference = step.inference.replace("|", "·")[:100]
             examined = step.examined.replace("|", "·")[:60]
             lines.append(f"| **{step.source}** | {examined} | {found} | {inference} |")
+        lines.append("")
 
-    # ── 7. Hidden insight ─────────────────────────────────────────────────────
-    if brief.hidden_insight:
-        lines += ["", "## Hidden Insight", f"> {brief.hidden_insight}"]
+    # ── 8. Hidden insight ─────────────────────────────────────────────────────
+    if memo.hidden_insight:
+        lines += ["## Hidden Insight", f"> {memo.hidden_insight}", ""]
 
-    # ── 8. Full detail (collapsible) ─────────────────────────────────────────
+    # ── 9. Full detail (collapsible) ─────────────────────────────────────────
     detail_lines: list[str] = []
 
-    if brief.market:
-        m = brief.market
-        detail_lines += ["### Market", "", f"**Segment:** {m.segment}"]
-        if m.sizing_note:
-            detail_lines.append(f"**Sizing:** {m.sizing_note}")
-        if m.tailwinds:
-            detail_lines.append("**Tailwinds:** " + " · ".join(m.tailwinds))
-        if m.headwinds:
-            detail_lines.append("**Headwinds:** " + " · ".join(m.headwinds))
-        if m.competitors:
-            detail_lines.append(f"**Competitors:** {', '.join(m.competitors)}")
-        detail_lines.append("")
+    if memo.market:
+        detail_lines += _render_memo_section("Market", memo.market)
 
-    detail_lines += ["### Founders", ""]
-    if brief.founders:
-        for f in brief.founders:
-            line = f"- **{f.name}** — {f.role}. {f.background}"
-            if f.notable_priors:
-                line += f" *(Prior: {', '.join(f.notable_priors)})*"
+    if memo.team:
+        detail_lines += ["### Team", ""]
+        for f in memo.team:
+            detail_lines.append(f"**{f.name}** — {f.role}")
+            if f.university:
+                detail_lines.append(f"  - University: {f.university}")
+            if f.prior_companies:
+                detail_lines.append(f"  - Prior: {', '.join(f.prior_companies)}")
+            if f.prior_exits_or_scaling:
+                detail_lines.append(f"  - Exits/scaling: {f.prior_exits_or_scaling}")
+            if f.domain_fit:
+                detail_lines.append(f"  - Domain fit: {f.domain_fit}")
             if f.linkedin_url:
-                line += f" [LinkedIn]({f.linkedin_url})"
-            detail_lines.append(line)
-    else:
-        detail_lines.append("*No founder data found in public sources.*")
-    detail_lines.append("")
+                detail_lines.append(f"  - [LinkedIn]({f.linkedin_url})")
+            for ep in f.evidence:
+                icon = _TRUST_ICON.get(ep.trust.lower(), "🔗")
+                detail_lines.append(f"  - {icon} *{ep.fact[:100]}* — [{ep.source}]({ep.url})")
+            detail_lines.append("")
 
-    if brief.traction:
-        detail_lines += ["### Traction", "", brief.traction.summary]
-        if brief.traction.github_url:
-            detail_lines.append(f"**GitHub:** {brief.traction.github_url}")
-        if brief.traction.hn_mentions:
-            detail_lines.append("**HN:** " + " · ".join(brief.traction.hn_mentions))
-        detail_lines.append("")
+    if memo.team_assessment:
+        detail_lines += _render_memo_section("Team Assessment", memo.team_assessment)
 
-    if brief.hiring:
-        detail_lines += ["### Hiring", "", brief.hiring.summary]
-        if brief.hiring.open_roles:
-            detail_lines.append(f"**Open roles:** {brief.hiring.open_roles}")
-    detail_lines.append("")
+    if memo.product:
+        detail_lines += _render_memo_section("Product", memo.product)
 
-    if brief.funding_history:
+    if memo.traction:
+        detail_lines += _render_memo_section("Traction", memo.traction)
+
+    if memo.business_model:
+        detail_lines += _render_memo_section("Business Model", memo.business_model)
+
+    if memo.competition:
+        detail_lines += _render_memo_section("Competition", memo.competition)
+
+    if memo.hiring_gtm:
+        detail_lines += _render_memo_section("Hiring / GTM", memo.hiring_gtm)
+
+    if memo.funding:
         detail_lines += ["### Funding", ""]
-        for r in brief.funding_history:
+        for r in memo.funding:
             investors = f" ({', '.join(r.investors)})" if r.investors else ""
             date = f" — {r.date}" if r.date else ""
             detail_lines.append(f"- **{r.round}** {r.amount or ''}{date}{investors}")
         detail_lines.append("")
 
-    if brief.recent_press:
-        detail_lines += ["### Recent Press", ""]
-        for p in brief.recent_press:
-            date = f" ({p.date})" if p.date else ""
-            detail_lines.append(f"- [{p.title}]({p.url}){date} — *{p.source}*")
-        detail_lines.append("")
-
-    if brief.competitive_positioning:
-        cp = brief.competitive_positioning
-        detail_lines += [
-            "### Competitive Positioning", "",
-            f"**Segment:** {cp.market_segment}",
-            f"**Differentiation:** {cp.differentiation}",
-        ]
-        if cp.competitors:
-            detail_lines.append(f"**Competitors:** {', '.join(cp.competitors)}")
-        detail_lines.append("")
-
-    if brief.red_flags:
-        detail_lines += ["### Red Flags", ""]
-        for rf in brief.red_flags:
-            detail_lines.append(f"- **{rf.category}** — {rf.detail}")
-        detail_lines.append("")
-
-    if brief.sources:
+    if memo.sources:
         detail_lines += ["### Sources", ""]
-        for url in brief.sources:
+        for url in memo.sources:
             detail_lines.append(f"- <{url}>")
 
-    lines += [
-        "",
-        "<details>",
-        "<summary><strong>Full Detail (market · founders · traction · funding · press)</strong></summary>",
-        "",
-        "\n".join(detail_lines),
-        "",
-        "</details>",
-    ]
+    if detail_lines:
+        lines += [
+            "<details>",
+            "<summary><strong>Full Detail (market · team · product · traction · competition · funding)</strong></summary>",
+            "",
+            "\n".join(detail_lines),
+            "",
+            "</details>",
+        ]
 
     # ── Stats footer ─────────────────────────────────────────────────────────
     if result.total_ms > 0:
@@ -279,7 +285,7 @@ def _render_markdown(result: ScoutResult) -> str:
 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="VC Scout") as ui:
-        gr.Markdown("# VC Scout\nCold inbound at 9:00 AM. Investor-ready brief by 9:01 AM.")
+        gr.Markdown("# VC Scout\nCold inbound at 9:00 AM. Investor-ready memo by 9:01 AM.")
         with gr.Row():
             company = gr.Textbox(label="Company name", placeholder="e.g. Anthropic", value="Wispr Flow")
             founder = gr.Textbox(label="Founder name (optional)")

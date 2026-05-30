@@ -72,10 +72,18 @@ def _fetch(page_url: str, browser_ws_url: str) -> str:
         try:
             ctx = browser.contexts[0] if browser.contexts else browser.new_context()
             page = ctx.new_page()
+            # Cap all page operations so a stalled CDP session can't hang the pipeline.
+            # evaluate() and wait_for_* both respect this limit.
+            page.set_default_timeout(12_000)
 
             # Main page
+            # NOTE: use "domcontentloaded", NOT "networkidle". Through the Bright Data
+            # Scraping Browser proxy, analytics/long-polling keep the network busy so
+            # "networkidle" never fires and goto times out (30s). DOM-ready plus a short
+            # settle for client-rendered content is reliable.
             log.info("Scraping Browser: navigating to %s", page_url)
-            page.goto(page_url, wait_until="networkidle", timeout=30_000)
+            page.goto(page_url, wait_until="domcontentloaded", timeout=30_000)
+            page.wait_for_timeout(2_500)  # let client-side JS paint
             log.info("Scraping Browser: loaded %s", page.url)
             main_text = _extract_text(page)
             if main_text:
@@ -86,7 +94,8 @@ def _fetch(page_url: str, browser_ws_url: str) -> str:
             for path in _EXTRA_PATHS:
                 try:
                     sub_url = base + path
-                    resp = page.goto(sub_url, wait_until="networkidle", timeout=15_000)
+                    resp = page.goto(sub_url, wait_until="domcontentloaded", timeout=12_000)
+                    page.wait_for_timeout(1_500)
                     # Only keep if we stayed on the same domain
                     if resp and resp.ok and _same_domain(page.url, page_url):
                         sub_text = _extract_text(page)
@@ -136,3 +145,30 @@ def _clean_and_truncate(text: str) -> str:
         if line.strip() and not _BOILERPLATE_RE.search(line)
     ]
     return "\n".join(lines)[:_TRUNCATE_CHARS]
+
+
+# ── Collector wrapper ────────────────────────────────────────────────────────
+
+class CompanySiteCollector:
+    """Collector: Scraping Browser → product / team / pricing signals from site."""
+    name = "Scraping Browser"
+
+    def applies_to(self, ctx) -> bool:
+        return bool(ctx.domain)
+
+    def collect(self, ctx) -> list:
+        from .base import Signal
+        url = f"https://{ctx.domain}"
+        site_text = fetch_site_text(url)
+        if not site_text:
+            return []
+        # Return one signal carrying the raw text; bundle.py splits it into claims
+        return [Signal(
+            section="product",
+            fact=site_text[:3000],
+            url=url,
+            source="Scraping Browser",
+            trust="low",
+            key="site_text",
+            value=site_text,
+        )]

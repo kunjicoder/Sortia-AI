@@ -112,3 +112,39 @@ def _first(item: Dict[str, Any], keys: tuple) -> str:
         if v:
             return str(v)
     return ""
+
+
+# ── Collector wrapper ────────────────────────────────────────────────────────
+
+class SerpCollector:
+    """Collector: SERP API facts → market / funding / competition / risks signals."""
+    name = "SERP API"
+
+    def applies_to(self, ctx) -> bool:
+        return True  # universal
+
+    def collect(self, ctx) -> list:
+        from .base import Signal
+        from ..bundle import _JUNK_SNIPPET_RE, _FUNDING_RE, _TRACTION_RE
+
+        signals = []
+        for item in ctx.serp_results:
+            fact = (item.get("description") or item.get("title") or "").strip()
+            if not fact or _JUNK_SNIPPET_RE.search(fact):
+                continue
+            url = item.get("url", "")
+            text = f"{item.get('title', '')} {fact}"
+            section = "market"
+            if _FUNDING_RE.search(text):
+                section = "funding"
+            elif _TRACTION_RE.search(text):
+                section = "traction"
+            signals.append(Signal(
+                section=section,
+                fact=fact[:300],
+                url=url,
+                source="SERP",
+                trust="high",
+                date=item.get("date", ""),
+            ))
+        return signals
